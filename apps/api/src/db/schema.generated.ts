@@ -50,6 +50,70 @@ export interface audit_events {
   trace_id: string | null
 }
 
+export interface conocimiento {
+  contenido: string
+  created_at: Generated<Timestamp>
+  id: Generated<Int8>
+  metadata: Generated<Json>
+  proyecto_id: Int8
+  titulo: string | null
+}
+
+export interface estatus {
+  comentario: string | null
+  created_at: Generated<Timestamp>
+  estado: number
+  id: Generated<Int8>
+  propuesta_id: Int8 | null
+  proyecto_id: Int8 | null
+}
+
+export interface nota {
+  created_at: Generated<Timestamp>
+  id: Generated<Int8>
+  metadata: Generated<Json>
+  propuesta_id: Int8
+  texto: string
+}
+
+export interface propuesta {
+  created_at: Generated<Timestamp>
+  documento: string | null
+  id: Generated<Int8>
+  metadata: Generated<Json>
+  monto: Numeric | null
+  proveedor_id: Int8
+  proyecto_id: Int8
+  updated_at: Generated<Timestamp>
+}
+
+export interface proveedor {
+  contacto: string | null
+  created_at: Generated<Timestamp>
+  id: Generated<Int8>
+  metadata: Generated<Json>
+  nombre: string
+  updated_at: Generated<Timestamp>
+}
+
+export interface proyecto {
+  created_at: Generated<Timestamp>
+  descripcion: string | null
+  id: Generated<Int8>
+  metadata: Generated<Json>
+  nombre: string
+  updated_at: Generated<Timestamp>
+}
+
+export interface recargos {
+  concepto: string
+  created_at: Generated<Timestamp>
+  id: Generated<Int8>
+  metadata: Generated<Json>
+  monto: Numeric
+  propuesta_id: Int8
+}
+
 export interface sessions {
   created_at: Generated<Timestamp>
   expires_at: Timestamp
@@ -83,6 +147,13 @@ export interface verifications {
 export interface DB {
   accounts: accounts
   audit_events: audit_events
+  conocimiento: conocimiento
+  estatus: estatus
+  nota: nota
+  propuesta: propuesta
+  proveedor: proveedor
+  proyecto: proyecto
+  recargos: recargos
   sessions: sessions
   users: users
   verifications: verifications

@@ -101,7 +101,13 @@ Files live in `apps/api/src/db/migrations` and are named with an ISO-like timest
 20261127121000_add_users_created_at_index.ts
 20261127130000_create_audit_events.ts
 20261127131000_add_authentication.ts
+20261127140000_create_core_domain_tables.ts
 ```
+
+The core domain migration adds the evaluator domain: `proyecto`, `proveedor`,
+`propuesta`, `estatus`, `recargos`, `nota`, and `conocimiento`. The `conocimiento`
+table is the LLM knowledge base; it will get a `VECTOR(1024)` embedding column
+(pgvector, bge-m3) in a later migration once vector search is wired up.
 
 Each file exports:
 
@@ -148,8 +154,8 @@ pnpm db:status     # show applied/pending
 The file is committed so typecheck and builds do not require a database. It is ignored by Oxlint and
 Oxfmt because it is generated. Do not edit it by hand.
 
-The generated file contains the `users` table, the Better Auth tables, `audit_events`, and the `DB`
-type:
+The generated file contains the `users` table, the Better Auth tables, `audit_events`, the core
+domain tables, and the `DB` type:
 
 ```ts
 export interface accounts {
@@ -205,6 +211,13 @@ export interface verifications {
 export interface DB {
   accounts: accounts;
   audit_events: audit_events;
+  conocimiento: conocimiento;
+  estatus: estatus;
+  nota: nota;
+  propuesta: propuesta;
+  proveedor: proveedor;
+  proyecto: proyecto;
+  recargos: recargos;
   sessions: sessions;
   users: users;
   verifications: verifications;
