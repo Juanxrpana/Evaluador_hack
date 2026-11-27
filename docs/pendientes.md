@@ -10,15 +10,15 @@ Leyenda: ✅ implementado · 🟡 parcial · ❌ falta.
 
 ## Resumen ejecutivo
 
-| Sección | Qué exige | Puntos en juego | Estado |
-| --- | --- | --- | --- |
-| A | Ingesta multimodal (PDF, escaneado, manuscrito, XLSX/PNG) | parte de Plataforma | 🟡 |
-| B | Letra pequeña, verificación aritmética, alcance | parte de Plataforma | 🟡 |
-| C | Contraste de precios en internet | parte de Plataforma | ❌ |
-| D | UI: carga proyecto, carga masiva, botón Evaluar, informe | parte de Plataforma | 🟡 |
-| E | Plataforma completa (estados, roles, monedas, reportes) | **75 pts** | 🟡 |
-| F | Seguridad (TLS, cifrado en reposo) | parte de Plataforma | ❌ |
-| 3 | Modo lote + `salida.json` + ranking | **25 pts** (1,25 × 20) | ❌ |
+| Sección | Qué exige                                                 | Puntos en juego        | Estado                            |
+| ------- | --------------------------------------------------------- | ---------------------- | --------------------------------- |
+| A       | Ingesta multimodal (PDF, escaneado, manuscrito, XLSX/PNG) | parte de Plataforma    | 🟡                                |
+| B       | Letra pequeña, verificación aritmética, alcance           | parte de Plataforma    | 🟡                                |
+| C       | Contraste de precios en internet                          | parte de Plataforma    | ❌                                |
+| D       | UI: carga proyecto, carga masiva, botón Evaluar, informe  | parte de Plataforma    | 🟡                                |
+| E       | Plataforma completa (estados, roles, monedas, reportes)   | **75 pts**             | 🟡                                |
+| F       | Seguridad (TLS, cifrado en reposo)                        | parte de Plataforma    | 🟡 (cifrado en reposo ✅, TLS ❌) |
+| 3       | Modo lote + `salida.json` + ranking                       | **25 pts** (1,25 × 20) | ❌                                |
 
 Lo más urgente no es lo más visible: **el modo lote con `salida.json` no existe y vale 25 puntos**.
 Todo lo demás alimenta la plataforma (75 pts).
@@ -159,9 +159,12 @@ Todo lo demás alimenta la plataforma (75 pts).
 - [ ] **F.1 Cifrado en tránsito (TLS 1.2/1.3)** 🟡
       El stack local es HTTP. Para la demo/despliegue: proxy con TLS (nginx/Caddy) delante de
       web+api, o exponer solo vía HTTPS. Documentar la topología (`TRUST_PROXY`).
-- [ ] **F.2 Cifrado en reposo (AES-256)** ❌
-      Los documentos se guardan como `bytea` plano en PostgreSQL. Falta: cifrado de
-      `documento.contenido` (p. ej. `pgcrypto`/AES-256 en la app) y criterio para BD/auditoría.
+- [x] **F.2 Cifrado en reposo (AES-256)** ✅
+      `documento.contenido` se cifra con AES-256-GCM dentro del adaptador de escritura
+      (`documento.crypto.ts`): la base solo ve ciphertext, `tamano_bytes` conserva el tamaño
+      original y el algoritmo queda marcado en `documento.metadata.enc`. La clave vive en
+      `DOCUMENTO_ENCRYPTION_KEY` (32 bytes base64, fail-fast al arrancar). Pendiente opcional:
+      extender el cifrado a los chunks de `conocimiento` y al volumen del disco.
 - [ ] **F.3 Confidencialidad hacia el buscador** (ligado a C.1) ❌
       Nunca enviar texto de propuestas a buscadores: solo especificaciones normalizadas de
       insumos. Debe quedar como regla explícita y test del módulo mercado.

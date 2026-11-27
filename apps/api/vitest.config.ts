@@ -16,6 +16,9 @@ export default defineConfig({
       EMBEDDING_CACHE_DIR: '.models-test',
       // Keep the upload-size guard testable without huge payloads.
       DOCUMENT_MAX_BYTES: '1024',
+      // AES-256 key (32 bytes, base64) for the at-rest document encryption
+      // tests; the value is deterministic and never used outside the suite.
+      DOCUMENTO_ENCRYPTION_KEY: 'dGVzdC1vbmx5LWRvY3VtZW50b3MtY3J5cHRvLWtleSE=',
     },
   },
 });

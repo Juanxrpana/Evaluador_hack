@@ -5,6 +5,7 @@ import { env } from './config/env.ts';
 import { createAuth } from './auth/auth.ts';
 import { createDatabase } from './db/client.ts';
 import { createTransactionRunner } from './db/transaction.ts';
+import { Aes256GcmDocumentoCrypto } from './modules/documentos/documento.crypto.ts';
 import { LocalBgeM3EmbeddingClient } from './modules/ai/local-bge.embedding.client.ts';
 import { OpenRouterLlmClient } from './modules/ai/openrouter-llm.client.ts';
 import { PostgresAuditWriter } from './modules/audit/postgres-audit.writer.ts';
@@ -80,6 +81,12 @@ logger.info('Database connection verified');
 const llm = new OpenRouterLlmClient();
 const embeddings = new LocalBgeM3EmbeddingClient();
 
+// At-rest encryption for uploaded documents: the storage adapters encrypt,
+// every other layer keeps handling plaintext bytes in memory.
+const documentoCrypto = new Aes256GcmDocumentoCrypto(
+  Buffer.from(env.DOCUMENTO_ENCRYPTION_KEY, 'base64'),
+);
+
 function auditContext() {
   const context = getRequestContext();
 
@@ -118,7 +125,7 @@ const runInPropuestaTransaction: PropuestaTransactionRunner =
 
 const runInDocumentoTransaction: DocumentoTransactionRunner =
   createTransactionRunner<DocumentoTransaction>(db, (trx) => ({
-    documentos: new PostgresDocumentoWriter(trx),
+    documentos: new PostgresDocumentoWriter(trx, documentoCrypto),
     conocimiento: new PostgresConocimientoWriter(trx),
     propuestas: new PostgresPropuestaWriter(trx),
     recargos: new PostgresRecargoWriter(trx),

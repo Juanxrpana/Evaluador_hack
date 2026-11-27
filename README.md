@@ -362,25 +362,26 @@ draft-8 `RateLimit` and `RateLimit-Policy` headers; a 429 includes `Retry-After`
 with the request ID. The default stores are in-memory and per-process; use a shared store before
 running multiple API replicas.
 
-| Variable                  | Default                        | Purpose                                                     |
-| ------------------------- | ------------------------------ | ----------------------------------------------------------- |
-| `BETTER_AUTH_SECRET`      | required                       | At least 32 random characters; signs cookies and tokens.    |
-| `BETTER_AUTH_URL`         | `http://localhost:3000`        | Public API origin used by Better Auth.                      |
-| `CORS_ORIGIN`             | `http://localhost:5173`        | Allowed web origin; also a Better Auth trusted origin.      |
-| `LOG_LEVEL`               | `info`                         | Pino level: `fatal`, `error`, `warn`, `info`, `debug`, etc. |
-| `LOG_PRETTY`              | `false`                        | Human-readable dev output; ignored in production.           |
-| `TRUST_PROXY`             | `false`                        | Express trust-proxy setting used for `req.ip`.              |
-| `RATE_LIMIT_WINDOW_MS`    | `60000`                        | Rate-limit window in milliseconds.                          |
-| `RATE_LIMIT_MAX`          | `120`                          | Requests per IP per window for non-auth `/api` traffic.     |
-| `RATE_LIMIT_WRITE_MAX`    | `30`                           | Writes per IP per window for non-auth `/api` traffic.       |
-| `OPENROUTER_API_KEY`      | required                       | OpenRouter key for chat and vision analysis.                |
-| `OPENROUTER_BASE_URL`     | `https://openrouter.ai/api/v1` | OpenRouter API base.                                        |
-| `OPENROUTER_CHAT_MODEL`   | `google/gemini-2.5-flash`      | Model used for chat answers.                                |
-| `OPENROUTER_VISION_MODEL` | `google/gemini-2.5-flash`      | Model used to describe uploaded images.                     |
-| `AI_TIMEOUT_MS`           | `120000`                       | Abort timeout for OpenRouter calls.                         |
-| `EMBEDDING_MODEL`         | `Xenova/bge-m3`                | Local ONNX embedding model (transformers.js).               |
-| `EMBEDDING_CACHE_DIR`     | `.models`                      | Where the embedding model downloads once.                   |
-| `DOCUMENT_MAX_BYTES`      | `15728640`                     | Max upload size (15 MiB).                                   |
+| Variable                   | Default                        | Purpose                                                     |
+| -------------------------- | ------------------------------ | ----------------------------------------------------------- |
+| `BETTER_AUTH_SECRET`       | required                       | At least 32 random characters; signs cookies and tokens.    |
+| `BETTER_AUTH_URL`          | `http://localhost:3000`        | Public API origin used by Better Auth.                      |
+| `CORS_ORIGIN`              | `http://localhost:5173`        | Allowed web origin; also a Better Auth trusted origin.      |
+| `LOG_LEVEL`                | `info`                         | Pino level: `fatal`, `error`, `warn`, `info`, `debug`, etc. |
+| `LOG_PRETTY`               | `false`                        | Human-readable dev output; ignored in production.           |
+| `TRUST_PROXY`              | `false`                        | Express trust-proxy setting used for `req.ip`.              |
+| `RATE_LIMIT_WINDOW_MS`     | `60000`                        | Rate-limit window in milliseconds.                          |
+| `RATE_LIMIT_MAX`           | `120`                          | Requests per IP per window for non-auth `/api` traffic.     |
+| `RATE_LIMIT_WRITE_MAX`     | `30`                           | Writes per IP per window for non-auth `/api` traffic.       |
+| `OPENROUTER_API_KEY`       | required                       | OpenRouter key for chat and vision analysis.                |
+| `OPENROUTER_BASE_URL`      | `https://openrouter.ai/api/v1` | OpenRouter API base.                                        |
+| `OPENROUTER_CHAT_MODEL`    | `google/gemini-2.5-flash`      | Model used for chat answers.                                |
+| `OPENROUTER_VISION_MODEL`  | `google/gemini-2.5-flash`      | Model used to describe uploaded images.                     |
+| `AI_TIMEOUT_MS`            | `120000`                       | Abort timeout for OpenRouter calls.                         |
+| `EMBEDDING_MODEL`          | `Xenova/bge-m3`                | Local ONNX embedding model (transformers.js).               |
+| `EMBEDDING_CACHE_DIR`      | `.models`                      | Where the embedding model downloads once.                   |
+| `DOCUMENT_MAX_BYTES`       | `15728640`                     | Max upload size (15 MiB).                                   |
+| `DOCUMENTO_ENCRYPTION_KEY` | required                       | 32-byte base64 key; AES-256-GCM for `documento.contenido`.  |
 
 ## AI chat and the vectorized knowledge base
 
@@ -446,6 +447,10 @@ git-ignored because it is derived from the contract.
 
 ## Safety notes
 
+- Uploaded documents are encrypted at rest with **AES-256-GCM** in the storage adapter:
+  the database only ever sees ciphertext (`documento.contenido`), the algorithm is marked in
+  `documento.metadata.enc`, and the key comes from `DOCUMENTO_ENCRYPTION_KEY`. `descifrar()` in
+  `documento.crypto.ts` is the only sanctioned read path back to plaintext.
 - oRPC is mounted **before** `express.json()` so it can read raw request bodies without Express
   consuming them first. Better Auth is mounted before oRPC for the same reason.
 - Environment variables are parsed with Zod at process start; missing `DATABASE_URL` or

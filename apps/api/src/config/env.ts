@@ -49,6 +49,14 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(15 * 1024 * 1024),
+  // At-rest encryption for uploaded documents (AES-256-GCM over
+  // documento.contenido). Generate with: openssl rand -base64 32.
+  DOCUMENTO_ENCRYPTION_KEY: z
+    .base64()
+    .refine(
+      (value) => Buffer.from(value, 'base64').byteLength === 32,
+      'DOCUMENTO_ENCRYPTION_KEY must decode to exactly 32 bytes',
+    ),
 });
 
 export const env = envSchema.parse(process.env);
