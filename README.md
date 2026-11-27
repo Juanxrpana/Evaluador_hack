@@ -130,6 +130,22 @@ it.
 | `pnpm db:types`     | Regenerate Kysely types from migrations via in-memory PGlite         |
 | `pnpm openapi`      | Emit `apps/api/openapi.json` from the contract                       |
 
+## Mobile app (React Native + Expo)
+
+`apps/mobile` is an Expo (SDK 58) client reusing the same oRPC contract and
+Zod schemas as the web app. Authentication uses Better Auth's bearer plugin:
+the sign-in/sign-up response carries a session token that the app stores in
+`expo-secure-store` and sends as `Authorization: Bearer` (React Native has no
+cookie jar; the web app keeps using cookies).
+
+```bash
+pnpm --filter @repo/mobile dev
+```
+
+Point `EXPO_PUBLIC_API_URL` (see `apps/mobile/.env.example`) at the API:
+`http://localhost:3000` for iOS/web, `http://10.0.2.2:3000` for the Android
+emulator, or the host LAN IP for a physical device.
+
 ## Layout
 
 ```text
@@ -177,6 +193,11 @@ it.
 │  │  │  ├─ transaction.types.ts         # compile-time tx guard
 │  │  │  └─ support/test-database.ts     # PGlite or TEST_DATABASE_URL
 │  │  └─ vitest.config.ts
+│  ├─ mobile/
+│  │  ├─ src/app/                        # expo-router routes: (auth) + (tabs)
+│  │  ├─ src/lib/                        # auth-client, orpc, session, token
+│  │  ├─ metro.config.js                 # workspace-aware Metro
+│  │  └─ app.json                        # Expo config (scheme evaluador)
 │  └─ web/
 │     ├─ Dockerfile                     # Vite build + nginx image
 │     ├─ nginx.conf                     # SPA fallback + /api proxy

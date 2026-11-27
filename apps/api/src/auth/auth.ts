@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth';
+import { bearer } from 'better-auth/plugins';
 import type { Kysely } from 'kysely';
 import type { DB } from '../db/schema.generated.ts';
 import { uuidv7 } from '../shared/uuidv7.ts';
@@ -23,6 +24,12 @@ export function createAuth(db: Kysely<DB>, config: AuthConfig) {
     emailAndPassword: {
       enabled: true,
     },
+    plugins: [
+      // Lets the React Native app authenticate with `Authorization: Bearer`:
+      // sign-in/sign-up responses include the session token (RN has no
+      // cookie jar). The web app keeps using cookies.
+      bearer(),
+    ],
     database: {
       db,
       type: 'postgres',
