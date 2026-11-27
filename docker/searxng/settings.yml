@@ -1,0 +1,15 @@
+use_default_settings: true
+
+server:
+  # Hackathon-local instance: no limiter, JSON enabled for the API adapter.
+  secret_key: evaluador-hackaton-local-9f4b2c1a7e
+  limiter: false
+  image_proxy: true
+
+search:
+  safe_search: 0
+  autocomplete: ''
+  default_lang: es
+  formats:
+    - html
+    - json
