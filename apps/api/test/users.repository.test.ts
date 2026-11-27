@@ -2,12 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { createUserSchema, userSchema } from '@repo/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMigrator } from '../src/db/migrator.ts';
+import { createTransactionRunner } from '../src/db/transaction.ts';
 import { EmailAlreadyExistsError } from '../src/modules/users/user.errors.ts';
-import { PostgresUserRepository } from '../src/modules/users/postgres-user.repository.ts';
+import { PostgresUserReader } from '../src/modules/users/postgres-user.reader.ts';
+import { PostgresUserWriter } from '../src/modules/users/postgres-user.writer.ts';
 import { createTestDatabase, type TestDatabase } from './support/test-database.ts';
 
 let testDb: TestDatabase;
-let repository: PostgresUserRepository;
+let reader: PostgresUserReader;
+let runInTransaction: ReturnType<typeof createTransactionRunner<{ users: PostgresUserWriter }>>;
 
 beforeAll(async () => {
   testDb = await createTestDatabase();
@@ -17,27 +20,30 @@ beforeAll(async () => {
     throw result.error;
   }
 
-  repository = new PostgresUserRepository(testDb.db);
+  reader = new PostgresUserReader(testDb.db);
+  runInTransaction = createTransactionRunner(testDb.db, (trx) => ({
+    users: new PostgresUserWriter(trx),
+  }));
 });
 
 afterAll(async () => {
   await testDb.destroy();
 });
 
-describe('PostgresUserRepository', () => {
+describe('Postgres user adapters', () => {
   it('round-trips a user through PostgreSQL and the Zod contract', async () => {
     const input = createUserSchema.parse({
       name: '  Grace Hopper  ',
       email: `grace-${randomUUID()}@example.com`,
     });
 
-    const created = await repository.create(input);
+    const created = await runInTransaction(({ users }) => users.create(input));
 
     expect(created.name).toBe('Grace Hopper');
     expect(created.createdAt).toBe(new Date(created.createdAt).toISOString());
     expect(userSchema.parse(created)).toEqual(created);
 
-    const users = await repository.list();
+    const users = await reader.list();
     expect(users).toContainEqual(created);
   });
 
@@ -45,10 +51,10 @@ describe('PostgresUserRepository', () => {
     const email = `duplicate-${randomUUID()}@example.com`;
     const input = createUserSchema.parse({ name: 'First User', email });
 
-    await repository.create(input);
+    await runInTransaction(({ users }) => users.create(input));
 
-    await expect(repository.create({ ...input, name: 'Second User' })).rejects.toBeInstanceOf(
-      EmailAlreadyExistsError,
-    );
+    await expect(
+      runInTransaction(({ users }) => users.create({ ...input, name: 'Second User' })),
+    ).rejects.toBeInstanceOf(EmailAlreadyExistsError);
   });
 });

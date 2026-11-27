@@ -4,7 +4,7 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import { env } from './config/env.ts';
-import type { UserRepository } from './modules/users/user.repository.ts';
+import type { UserService } from './modules/users/user.service.ts';
 import { auditMutations } from './observability/audit.ts';
 import { errorHandler, notFound } from './observability/error-handler.ts';
 import { exposedHeaders, noStore } from './observability/http-headers.ts';
@@ -15,7 +15,7 @@ import { requestId } from './observability/request-id.ts';
 import { createRouter } from './router/index.ts';
 
 export interface AppDependencies {
-  users: UserRepository;
+  users: UserService;
 }
 
 export function createApp(dependencies: AppDependencies) {

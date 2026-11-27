@@ -86,21 +86,29 @@ pnpm db:types
 `db:types` runs the migrations in in-memory PGlite and regenerates
 `apps/api/src/db/schema.generated.ts`.
 
-## 4. Keep persistence behind an interface
+## 4. Keep persistence behind read and write ports
 
-`apps/api/src/modules/users/user.repository.ts`:
+`apps/api/src/modules/users/user.reader.ts`:
 
 ```ts
-export interface UserRepository {
+export interface UserReader {
   list(): Promise<User[]>;
+}
+```
+
+`apps/api/src/modules/users/user.writer.ts`:
+
+```ts
+export interface UserWriter {
   create(input: CreateUserInput): Promise<User>;
 }
 ```
 
-`PostgresUserRepository` implements it with Kysely. The router does not know about Kysely, `pg`, or
-table names.
+`PostgresUserReader` takes the root `Kysely<DB>` and handles `list`. `PostgresUserWriter` takes a
+`Transaction<DB>` and handles `create`. That split is deliberate: constructing the writer with the
+root connection is a compile error, so a write cannot silently escape the unit of work.
 
-The adapter maps the generated row to the Zod type:
+Both adapters share the mapper in `apps/api/src/modules/users/user.mapper.ts`:
 
 ```ts
 function toUser(row: Selectable<DB['users']>): User {
@@ -116,11 +124,95 @@ function toUser(row: Selectable<DB['users']>): User {
 If the database schema or the Zod schema changes, this mapper fails to compile. That is the
 anti-drift mechanism.
 
-## 5. Implement the contract
+## 5. Implement the service and the contract
 
-`apps/api/src/router/index.ts`:
+The module-local transaction context exposes only the repositories this use case needs:
+
+`apps/api/src/modules/users/user.transaction.ts`:
 
 ```ts
+export interface UserTransaction {
+  readonly users: UserWriter;
+  readonly audit: AuditWriter;
+}
+
+export type UserTransactionRunner = TransactionRunner<UserTransaction>;
+```
+
+The generic runner lives in `apps/api/src/db/transaction.ts` and is the only place that opens a
+transaction:
+
+```ts
+export function createTransactionRunner<Tx>(
+  db: Kysely<DB>,
+  createContext: (trx: Transaction<DB>) => Tx,
+): TransactionRunner<Tx> {
+  return (work) => db.transaction().execute((trx) => work(createContext(trx)));
+}
+```
+
+`apps/api/src/modules/users/user.service.ts` owns the use case and the transaction boundary:
+
+```ts
+export class UserService {
+  readonly #reader: UserReader;
+  readonly #runInTransaction: UserTransactionRunner;
+
+  constructor(reader: UserReader, runInTransaction: UserTransactionRunner) {
+    this.#reader = reader;
+    this.#runInTransaction = runInTransaction;
+  }
+
+  list(): Promise<User[]> {
+    return this.#reader.list();
+  }
+
+  create(input: CreateUserInput): Promise<User> {
+    return this.#runInTransaction(async ({ users, audit }) => {
+      const user = await users.create(input);
+
+      await audit.record({
+        action: 'user.create',
+        resource: 'user',
+        resourceId: user.id,
+      });
+
+      return user;
+    });
+  }
+}
+```
+
+The composition root wires the context factory and the service:
+
+```ts
+const runInUserTransaction: UserTransactionRunner = createTransactionRunner<UserTransaction>(
+  db,
+  (trx) => {
+    const context = getRequestContext();
+
+    return {
+      users: new PostgresUserWriter(trx),
+      audit: new PostgresAuditWriter(trx, {
+        actorId: context?.actorId,
+        requestId: context?.requestId,
+        traceId: context?.traceId,
+      }),
+    };
+  },
+);
+
+const userService = new UserService(new PostgresUserReader(db), runInUserTransaction);
+```
+
+`apps/api/src/router/index.ts` remains a transport adapter. It depends on `UserService`, maps domain
+errors, and emits the stdout success audit after the transaction has committed:
+
+```ts
+export interface RouterDependencies {
+  users: UserService;
+}
+
 export function createRouter({ users }: RouterDependencies) {
   const os = implement(contract);
 
@@ -253,23 +345,40 @@ const createUser = useMutation(
 Client-side validation and server-side validation use the same Zod object. The server remains the
 authority. A duplicate email returns 409 and is displayed through `createUser.error`.
 
-## 9. Test the migration and repository
+## 9. Test the migration, adapters, service, and transaction boundary
 
 `apps/api/test/migrations.test.ts` proves:
 
 1. Apply all migrations.
 2. Revert to `NO_MIGRATIONS`.
 3. Re-apply.
-4. Check the users table and migration history at each step.
+4. Check the `users` and `audit_events` tables and migration history at each step.
 
 `apps/api/test/users.repository.test.ts` proves:
 
 - Input is parsed through `createUserSchema`.
+- The user is inserted through the transaction runner.
 - The Postgres row is mapped and parsed through `userSchema`.
 - `createdAt` is a valid ISO timestamp.
+- `PostgresUserReader.list()` returns the inserted user.
 - Duplicate emails raise `EmailAlreadyExistsError`.
 
-Default test database: in-memory PGlite.
+`apps/api/test/users.service.test.ts` proves the service orchestration with fake ports:
+
+- `list` delegates to `UserReader`.
+- `create` calls the user writer, then the audit writer.
+- A user-write failure skips the audit write.
+- An audit failure propagates so the caller can roll back.
+
+`apps/api/test/transaction.test.ts` proves the real PostgreSQL boundary:
+
+- A successful callback commits both the user and the `audit_events` row.
+- A thrown error rolls back both writes.
+- `apps/api/test/transaction.types.ts` is a compile-time guard: the root Kysely instance is
+  rejected by `PostgresUserWriter`.
+
+Default test database: in-memory PGlite. PGlite is single-connection, so serialization conflicts,
+deadlocks, pool exhaustion, and retry behavior require real PostgreSQL.
 
 ```bash
 pnpm test
@@ -294,18 +403,21 @@ hand. The React client does not require it.
 
 ## Where each concern lives
 
-| Concern                       | Source                                    |
-| ----------------------------- | ----------------------------------------- |
-| API input DTO                 | `createUserSchema`                        |
-| API output DTO                | `userSchema`                              |
-| Client request/response types | `ContractRouterClient<typeof contract>`   |
-| Form validation               | `zodResolver(createUserSchema)`           |
-| Server validation             | oRPC contract                             |
-| Table DDL                     | PostgreSQL migration                      |
-| Query row types               | `schema.generated.ts` from Kysely typegen |
-| Row → API mapping             | `toUser()` in the repository              |
-| Axios client                  | Not needed; `OpenAPILink` is typed fetch  |
-| OpenAPI schema                | Generated from the contract               |
+| Concern                       | Source                                         |
+| ----------------------------- | ---------------------------------------------- |
+| API input DTO                 | `createUserSchema`                             |
+| API output DTO                | `userSchema`                                   |
+| Client request/response types | `ContractRouterClient<typeof contract>`        |
+| Form validation               | `zodResolver(createUserSchema)`                |
+| Server validation             | oRPC contract                                  |
+| Table DDL                     | PostgreSQL migration                           |
+| Query row types               | `schema.generated.ts` from Kysely typegen      |
+| Row → API mapping             | `toUser()` in `user.mapper.ts`                 |
+| Read/write ports              | `UserReader` / `UserWriter`                    |
+| Transaction boundary          | `UserService.create` + `UserTransactionRunner` |
+| Durable audit                 | `PostgresAuditWriter` + `audit_events`         |
+| Axios client                  | Not needed; `OpenAPILink` is typed fetch       |
+| OpenAPI schema                | Generated from the contract                    |
 
 ## Add another feature
 
@@ -313,24 +425,29 @@ hand. The React client does not require it.
 2. Add a procedure to `contract.ts` with `.route`, `.input`, and `.output`.
 3. Add a timestamped migration with `up` and `down`.
 4. Run `pnpm db:migrate` and `pnpm db:types`.
-5. Add or extend a repository interface under `apps/api/src/modules`.
-6. Implement the Postgres adapter and row mapper.
-7. Implement the procedure in `apps/api/src/router/index.ts`.
-8. Add a route under `apps/web/src/routes` and query it with
-   `orpc.<feature>.<procedure>.queryOptions()`.
-9. If it mutates, add a form with the shared schema and invalidate `orpc.<feature>.key()`.
-10. Add migration and repository tests.
-11. Run `pnpm check`, `pnpm build`, and optionally `pnpm openapi`.
+5. Add `XReader` / `XWriter` ports under `apps/api/src/modules/<feature>`.
+6. Implement `PostgresXReader` over `Kysely<DB>` and `PostgresXWriter` over `Transaction<DB>`;
+   share the row mapper.
+7. Add any write adapters to the module's transaction context and the composition-root context
+   factory.
+8. Add an application service that owns the use case and, for writes, the transaction boundary.
+9. Implement the procedure in `apps/api/src/router/index.ts` against the service; keep error mapping
+   in the router.
+10. Add a route under `apps/web/src/routes` and query it with
+    `orpc.<feature>.<procedure>.queryOptions()`.
+11. If it mutates, add a form with the shared schema and invalidate `orpc.<feature>.key()`.
+12. Add migration, adapter, service, and transaction-boundary tests.
+13. Run `pnpm check`, `pnpm build`, and optionally `pnpm openapi`.
 
 ## SOLID mapping
 
-| Principle             | Where it shows up                                                                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Single Responsibility | Schemas and contract in `contracts`; migrations and Kysely in `db`; persistence in the repository adapter; HTTP wiring in `app.ts`; UI in routes/components. |
-| Open/Closed           | New features add a schema, contract entry, migration, repository method, and route. Existing features do not need edits to their types or validators.        |
-| Liskov Substitution   | Any `UserRepository` implementation can replace `PostgresUserRepository` without changing callers.                                                           |
-| Interface Segregation | `UserRepository` exposes only `list` and `create`; no consumer is forced to depend on Kysely details.                                                        |
-| Dependency Inversion  | `createRouter` depends on the `UserRepository` abstraction; the composition root injects the Postgres adapter; the web depends on the contract.              |
+| Principle             | Where it shows up                                                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Single Responsibility | Schemas and contract in `contracts`; migrations and Kysely in `db`; transaction lifecycle in `db/transaction.ts`; persistence in readers/writers; use case in the service.      |
+| Open/Closed           | New features add a schema, contract entry, migration, read/write adapters, service method, and route. The generic runner and existing features are untouched.                   |
+| Liskov Substitution   | `PostgresUserReader`/`PostgresUserWriter` honor `UserReader`/`UserWriter`; service tests use fakes; another adapter can replace Postgres without changing the service.          |
+| Interface Segregation | Reads and writes are separate ports; `UserTransaction` exposes only the repositories the use case needs.                                                                        |
+| Dependency Inversion  | The router depends on `UserService`; the service depends on ports and `UserTransactionRunner`; the composition root injects Postgres adapters; the web depends on the contract. |
 
 ## Safety checklist
 
@@ -346,7 +463,12 @@ hand. The React client does not require it.
 - [x] Mutating requests produce audit events, including 429s.
 - [x] Per-IP global and write rate limits are enabled.
 - [x] Expected 4xx errors are not logged as server incidents.
-- [x] Duplicate emails map to 409.
+- [x] Duplicate emails map to 409, using the `users_email_key` constraint.
+- [x] Write adapters require `Transaction<DB>`; only the transaction runner opens transactions.
+- [x] The user write and durable audit row commit or roll back together.
+- [x] Durable audit records committed facts only; failed attempts stay in the stdout stream.
+- [x] No external I/O, nested transaction, or implicit ALS transaction inside a unit of work.
+- [x] API pool sets connection, statement, and idle-in-transaction timeouts.
 - [x] SIGINT/SIGTERM close the HTTP server and destroy the DB pool.
 - [x] Migrations are never auto-applied.
 - [x] Production rollback requires `ALLOW_DB_ROLLBACK=1`.
@@ -354,3 +476,5 @@ hand. The React client does not require it.
 - [ ] Add authentication/authorization before exposing mutating endpoints.
 - [ ] Use a shared rate-limit store before running multiple API replicas.
 - [ ] Add CI and deployment migration orchestration.
+- [ ] Add retries, isolation options, transaction metrics, and idempotency keys when needed.
+- [ ] Replace local ACID with outbox/Saga only if services are split across databases.

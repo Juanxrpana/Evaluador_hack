@@ -5,13 +5,15 @@
 The project deliberately does **not** try to make one Zod object generate both API validation and
 SQL DDL.
 
-| Concern                                   | Owner                 | Artifact                                                 |
-| ----------------------------------------- | --------------------- | -------------------------------------------------------- |
-| API request/response validation and types | Zod                   | `packages/contracts/src/schemas/*`                       |
-| API shape and route metadata              | oRPC contract         | `packages/contracts/src/contract.ts`                     |
-| Table structure, indexes, constraints     | PostgreSQL migrations | `apps/api/src/db/migrations/*`                           |
-| Typed SQL query surface                   | Kysely                | `apps/api/src/db/schema.generated.ts`                    |
-| Row → API translation                     | Repository mapper     | `apps/api/src/modules/users/postgres-user.repository.ts` |
+| Concern                                   | Owner                 | Artifact                                              |
+| ----------------------------------------- | --------------------- | ----------------------------------------------------- |
+| API request/response validation and types | Zod                   | `packages/contracts/src/schemas/*`                    |
+| API shape and route metadata              | oRPC contract         | `packages/contracts/src/contract.ts`                  |
+| Table structure, indexes, constraints     | PostgreSQL migrations | `apps/api/src/db/migrations/*`                        |
+| Typed SQL query surface                   | Kysely                | `apps/api/src/db/schema.generated.ts`                 |
+| Row → API translation                     | Repository mapper     | `apps/api/src/modules/users/user.mapper.ts`           |
+| Transaction boundary                      | Application service   | `apps/api/src/modules/users/user.service.ts`          |
+| Durable success audit                     | Audit adapter         | `apps/api/src/modules/audit/postgres-audit.writer.ts` |
 
 This is not duplicated validation:
 
@@ -63,12 +65,15 @@ podman run --rm -d --name monorepo-postgres \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=app \
   -p 5432:5432 \
-  -v monorepo-postgres-data:/var/lib/postgresql/data \
+  -v monorepo-postgres-data:/var/lib/postgresql \
   docker.io/library/postgres:19
 
 # Optional real-Postgres test database
 podman exec monorepo-postgres createdb -U postgres app_test
 ```
+
+PostgreSQL 18+ images expect the volume at `/var/lib/postgresql`, with the versioned data directory
+created below it. Mounting `/var/lib/postgresql/data` makes the container exit on startup.
 
 `.env`:
 
@@ -134,9 +139,20 @@ pnpm db:status     # show applied/pending
 The file is committed so typecheck and builds do not require a database. It is ignored by Oxlint and
 Oxfmt because it is generated. Do not edit it by hand.
 
-The generated file contains the `users` table and the `DB` type:
+The generated file contains the `users` and `audit_events` tables and the `DB` type:
 
 ```ts
+export interface audit_events {
+  action: string;
+  actor_id: string | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  request_id: string | null;
+  resource: string;
+  resource_id: string;
+  trace_id: string | null;
+}
+
 export interface users {
   created_at: Generated<Timestamp>;
   email: string;
@@ -145,15 +161,32 @@ export interface users {
 }
 
 export interface DB {
+  audit_events: audit_events;
   users: users;
 }
 ```
 
 Run `pnpm db:types` after every migration change.
 
-## Repository mapping
+## Read and write repositories
 
-The production adapter uses generated Kysely types and maps rows to the Zod-owned API type:
+Persistence is split into two narrow ports:
+
+```ts
+export interface UserReader {
+  list(): Promise<User[]>;
+}
+
+export interface UserWriter {
+  create(input: CreateUserInput): Promise<User>;
+}
+```
+
+`PostgresUserReader` takes the root `Kysely<DB>` and is used for read-only queries.
+`PostgresUserWriter` takes a `Transaction<DB>`; constructing it with the root connection is a
+compile error, so a write cannot silently escape the unit of work.
+
+The shared mapper keeps the persistence/API boundary explicit:
 
 ```ts
 function toUser(row: Selectable<DB['users']>): User {
@@ -171,8 +204,46 @@ function toUser(row: Selectable<DB['users']>): User {
 - If a column is renamed or its nullability changes, the mapper fails to compile.
 - If the API schema changes, the mapper’s return type fails to compile.
 
-The repository also maps PostgreSQL unique violations (`23505`) to `EmailAlreadyExistsError`; the
-oRPC router turns that into HTTP 409.
+`PostgresUserWriter` maps only the `users_email_key` `23505` violation to
+`EmailAlreadyExistsError`; the oRPC router turns that into HTTP 409. Other unique violations keep
+their raw PostgreSQL error.
+
+## Transactions and durable audit
+
+`createTransactionRunner` is a module-agnostic adapter over `db.transaction().execute`. The
+composition root supplies a context factory:
+
+```ts
+const runInUserTransaction = createTransactionRunner<UserTransaction>(db, (trx) => {
+  const context = getRequestContext();
+
+  return {
+    users: new PostgresUserWriter(trx),
+    audit: new PostgresAuditWriter(trx, {
+      actorId: context?.actorId,
+      requestId: context?.requestId,
+      traceId: context?.traceId,
+    }),
+  };
+});
+```
+
+`UserService.create` calls it once. The user insert and the `audit_events` insert commit or roll back
+together. The transaction context is module-local (`users` + `audit`), not a global repository
+registry.
+
+Rules:
+
+- One transaction per use case. Repositories never open transactions.
+- No external I/O, nested transaction, or implicit ALS transaction inside the callback.
+- Default isolation is `READ COMMITTED`; use `SELECT ... FOR UPDATE` for contended rows.
+- Retry is not implemented. If added, retry only `40001`/`40P01` with a side-effect-free callback.
+- `audit_events` is success-only: a rollback removes the user and the audit row. Failed HTTP
+  attempts remain in the stdout audit stream.
+- `request_id` is `text`, not `uuid`: inbound `X-Request-Id` values are validated as safe strings,
+  not necessarily UUIDs.
+- The API pool sets a connection timeout, statement timeout, and
+  `idle_in_transaction_session_timeout`; migrations keep no statement timeout.
 
 ## Migration tests
 
@@ -185,14 +256,16 @@ pnpm test
 The migration test performs exactly:
 
 1. `migrateToLatest()`.
-2. Assert `users` exists.
+2. Assert `users` and `audit_events` exist.
 3. `migrateTo(NO_MIGRATIONS)`.
-4. Assert `users` is gone and migration history is empty.
+4. Assert both tables are gone and migration history is empty.
 5. `migrateToLatest()` again.
-6. Assert `users` exists.
+6. Assert `users` and `audit_events` exist.
 
-The repository test then inserts a user, validates the result with `userSchema`, lists it, and
-verifies duplicate emails raise the domain error.
+The adapter test then inserts a user through the transaction runner, validates the result with
+`userSchema`, lists it through `PostgresUserReader`, and verifies duplicate emails raise the domain
+error. A separate transaction test proves that a thrown error removes both the user and its
+`audit_events` row. The service test uses fake ports and a fake runner, so it needs no database.
 
 ### Real PostgreSQL 19 parity
 
@@ -214,6 +287,13 @@ production-fidelity check.
 
 - API startup verifies the database with `select 1` and fails fast.
 - The pool is destroyed on SIGINT/SIGTERM after the HTTP server closes.
+- The API pool sets `connectionTimeoutMillis`, `statement_timeout`, and
+  `idle_in_transaction_session_timeout`; migrations deliberately keep no statement timeout.
+- Transactions hold one pool connection. Keep them short and never perform external I/O inside.
+- Write repositories require `Transaction<DB>`; read repositories use the root connection.
+- Durable audit is written in the same transaction as the domain change and is success-only.
+- No nested transactions or ALS request transactions. Compose repositories in one service callback.
+- True ACID stops at one PostgreSQL database. A future service split uses an outbox and Saga, not 2PC.
 - No auto-migrations.
 - `db:rollback` is blocked in production without an explicit override.
 - Test URLs must contain `_test`; only generated schemas are dropped.
@@ -227,7 +307,10 @@ production-fidelity check.
 1. Add a timestamped migration with `up` and `down`.
 2. Run `pnpm db:migrate`.
 3. Run `pnpm db:types`.
-4. Add or extend a repository interface under `apps/api/src/modules`.
-5. Implement the Kysely adapter and map rows to the Zod API type.
-6. Add a migration test and a repository test.
-7. Run `pnpm check` and `pnpm build`.
+4. Add or extend read/write ports under `apps/api/src/modules`.
+5. Implement `Postgres*Reader` over `Kysely<DB>` and `Postgres*Writer` over `Transaction<DB>`;
+   map rows to the Zod API type.
+6. Add the write adapter to the module's transaction context and context factory.
+7. Add a service use case that owns the transaction boundary when the operation writes.
+8. Add migration, adapter, service, and transaction-boundary tests.
+9. Run `pnpm check` and `pnpm build`.

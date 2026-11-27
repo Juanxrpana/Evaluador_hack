@@ -1,11 +1,11 @@
 import { implement, ORPCError } from '@orpc/server';
 import { contract } from '@repo/contracts';
 import { EmailAlreadyExistsError } from '../modules/users/user.errors.ts';
-import type { UserRepository } from '../modules/users/user.repository.ts';
+import type { UserService } from '../modules/users/user.service.ts';
 import { recordAuditEvent } from '../observability/audit.ts';
 
 export interface RouterDependencies {
-  users: UserRepository;
+  users: UserService;
 }
 
 /**

@@ -13,9 +13,9 @@ afterAll(async () => {
   await testDb.destroy();
 });
 
-async function hasUsersTable(): Promise<boolean> {
+async function hasTable(name: string): Promise<boolean> {
   const tables = await testDb.db.introspection.getTables();
-  return tables.some((table) => table.name === 'users');
+  return tables.some((table) => table.name === name);
 }
 
 describe('database migrations', () => {
@@ -25,12 +25,14 @@ describe('database migrations', () => {
     const applied = await migrator.migrateToLatest();
     expect(applied.error).toBeUndefined();
     expect(applied.results?.every((result) => result.status === 'Success')).toBe(true);
-    expect(await hasUsersTable()).toBe(true);
+    expect(await hasTable('users')).toBe(true);
+    expect(await hasTable('audit_events')).toBe(true);
 
     const reversed = await migrator.migrateTo(NO_MIGRATIONS);
     expect(reversed.error).toBeUndefined();
     expect(reversed.results?.every((result) => result.status === 'Success')).toBe(true);
-    expect(await hasUsersTable()).toBe(false);
+    expect(await hasTable('users')).toBe(false);
+    expect(await hasTable('audit_events')).toBe(false);
 
     const historyAfterReversal = await migrator.getMigrations();
     expect(historyAfterReversal.every((migration) => migration.executedAt === undefined)).toBe(
@@ -40,6 +42,7 @@ describe('database migrations', () => {
     const reapplied = await migrator.migrateToLatest();
     expect(reapplied.error).toBeUndefined();
     expect(reapplied.results?.every((result) => result.status === 'Success')).toBe(true);
-    expect(await hasUsersTable()).toBe(true);
+    expect(await hasTable('users')).toBe(true);
+    expect(await hasTable('audit_events')).toBe(true);
   });
 });

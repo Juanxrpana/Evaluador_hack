@@ -23,6 +23,17 @@ export type JsonPrimitive = boolean | number | string | null
 
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive
 
+export interface audit_events {
+  action: string
+  actor_id: string | null
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  request_id: string | null
+  resource: string
+  resource_id: string
+  trace_id: string | null
+}
+
 export interface users {
   created_at: Generated<Timestamp>
   email: string
@@ -31,5 +42,6 @@ export interface users {
 }
 
 export interface DB {
+  audit_events: audit_events
   users: users
 }
