@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { messageOf } from '../../lib/errors';
 import { orpc } from '../../lib/orpc';
 import type { Correo } from '@repo/contracts';
@@ -212,7 +213,9 @@ function CorreosPage() {
       )}
 
       {seleccionado !== null && (
-        <ModalCorreo uid={seleccionado} onCerrar={() => setSeleccionado(null)} />
+        // Portal a <body>: la sección .page tiene una animación de entrada con
+        // transform retenido, que descuelga el position:fixed del viewport.
+        createPortal(<ModalCorreo uid={seleccionado} onCerrar={() => setSeleccionado(null)} />, document.body)
       )}
     </section>
   );
