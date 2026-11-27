@@ -60,11 +60,13 @@ const rolPermisos: Record<(typeof roles)[number][0], string[]> = {
 /**
  * Migrations are historical and intentionally untyped against the current
  * application schema.
+ *
+ * Identifiers are UUID v7 (time-ordered); see the core domain migration.
  */
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .createTable('rol')
-    .addColumn('id', 'bigserial', (column) => column.primaryKey())
+    .addColumn('id', 'uuid', (column) => column.primaryKey().defaultTo(sql`uuidv7()`))
     .addColumn('nombre', 'text', (column) => column.notNull().unique())
     .addColumn('descripcion', 'text')
     .addColumn('created_at', 'timestamptz', (column) => column.notNull().defaultTo(sql`now()`))
@@ -72,7 +74,7 @@ export async function up(db: Kysely<any>): Promise<void> {
 
   await db.schema
     .createTable('permiso')
-    .addColumn('id', 'bigserial', (column) => column.primaryKey())
+    .addColumn('id', 'uuid', (column) => column.primaryKey().defaultTo(sql`uuidv7()`))
     .addColumn('codigo', 'text', (column) => column.notNull().unique())
     .addColumn('descripcion', 'text')
     .addColumn('created_at', 'timestamptz', (column) => column.notNull().defaultTo(sql`now()`))
@@ -80,10 +82,10 @@ export async function up(db: Kysely<any>): Promise<void> {
 
   await db.schema
     .createTable('rol_permiso')
-    .addColumn('rol_id', 'int8', (column) =>
+    .addColumn('rol_id', 'uuid', (column) =>
       column.notNull().references('rol.id').onDelete('cascade'),
     )
-    .addColumn('permiso_id', 'int8', (column) =>
+    .addColumn('permiso_id', 'uuid', (column) =>
       column.notNull().references('permiso.id').onDelete('cascade'),
     )
     .addPrimaryKeyConstraint('rol_permiso_pkey', ['rol_id', 'permiso_id'])
@@ -91,7 +93,7 @@ export async function up(db: Kysely<any>): Promise<void> {
 
   await db.schema
     .alterTable('users')
-    .addColumn('rol_id', 'int8', (column) => column.references('rol.id').onDelete('set null'))
+    .addColumn('rol_id', 'uuid', (column) => column.references('rol.id').onDelete('set null'))
     .execute();
   await db.schema.createIndex('idx_users_rol').on('users').column('rol_id').execute();
 
@@ -105,11 +107,11 @@ export async function up(db: Kysely<any>): Promise<void> {
     .execute();
 
   const rolesDb = (await db.selectFrom('rol').select(['id', 'nombre']).execute()) as Array<{
-    id: number;
+    id: string;
     nombre: string;
   }>;
   const permisosDb = (await db.selectFrom('permiso').select(['id', 'codigo']).execute()) as Array<{
-    id: number;
+    id: string;
     codigo: string;
   }>;
 

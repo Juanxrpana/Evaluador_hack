@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import type { Kysely } from 'kysely';
 import type { DB } from '../db/schema.generated.ts';
+import { uuidv7 } from '../shared/uuidv7.ts';
 
 export interface AuthConfig {
   secret: string;
@@ -29,9 +30,10 @@ export function createAuth(db: Kysely<DB>, config: AuthConfig) {
     },
     advanced: {
       database: {
-        // The existing users.id column is uuid. Better Auth then generates
-        // UUID strings for sessions, accounts, and verifications too.
-        generateId: 'uuid',
+        // The `users.id` column is uuid. Every id Better Auth generates
+        // (users, sessions, accounts, verifications) is UUID v7: time-ordered
+        // like the domain tables' PostgreSQL `uuidv7()` defaults.
+        generateId: () => uuidv7(),
       },
       ipAddress: {
         // `app.ts` overwrites this header with Express `req.ip`, which already

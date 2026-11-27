@@ -53,9 +53,9 @@ export interface audit_events {
 export interface conocimiento {
   contenido: string
   created_at: Generated<Timestamp>
-  id: Generated<Int8>
+  id: Generated<string>
   metadata: Generated<Json>
-  proyecto_id: Int8
+  proyecto_id: string
   titulo: string | null
 }
 
@@ -63,16 +63,16 @@ export interface estatus {
   comentario: string | null
   created_at: Generated<Timestamp>
   estado: number
-  id: Generated<Int8>
-  propuesta_id: Int8 | null
-  proyecto_id: Int8 | null
+  id: Generated<string>
+  propuesta_id: string | null
+  proyecto_id: string | null
 }
 
 export interface nota {
   created_at: Generated<Timestamp>
-  id: Generated<Int8>
+  id: Generated<string>
   metadata: Generated<Json>
-  propuesta_id: Int8
+  propuesta_id: string
   texto: string
 }
 
@@ -80,24 +80,24 @@ export interface permiso {
   codigo: string
   created_at: Generated<Timestamp>
   descripcion: string | null
-  id: Generated<Int8>
+  id: Generated<string>
 }
 
 export interface propuesta {
   created_at: Generated<Timestamp>
   documento: string | null
-  id: Generated<Int8>
+  id: Generated<string>
   metadata: Generated<Json>
   monto: Numeric | null
-  proveedor_id: Int8
-  proyecto_id: Int8
+  proveedor_id: string
+  proyecto_id: string
   updated_at: Generated<Timestamp>
 }
 
 export interface proveedor {
   contacto: string | null
   created_at: Generated<Timestamp>
-  id: Generated<Int8>
+  id: Generated<string>
   metadata: Generated<Json>
   nombre: string
   updated_at: Generated<Timestamp>
@@ -106,7 +106,7 @@ export interface proveedor {
 export interface proyecto {
   created_at: Generated<Timestamp>
   descripcion: string | null
-  id: Generated<Int8>
+  id: Generated<string>
   metadata: Generated<Json>
   nombre: string
   updated_at: Generated<Timestamp>
@@ -115,22 +115,22 @@ export interface proyecto {
 export interface recargos {
   concepto: string
   created_at: Generated<Timestamp>
-  id: Generated<Int8>
+  id: Generated<string>
   metadata: Generated<Json>
   monto: Numeric
-  propuesta_id: Int8
+  propuesta_id: string
 }
 
 export interface rol {
   created_at: Generated<Timestamp>
   descripcion: string | null
-  id: Generated<Int8>
+  id: Generated<string>
   nombre: string
 }
 
 export interface rol_permiso {
-  permiso_id: Int8
-  rol_id: Int8
+  permiso_id: string
+  rol_id: string
 }
 
 export interface sessions {
@@ -151,7 +151,7 @@ export interface users {
   id: Generated<string>
   image: string | null
   name: string
-  rol_id: Int8 | null
+  rol_id: string | null
   updated_at: Generated<Timestamp>
 }
 

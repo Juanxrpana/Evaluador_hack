@@ -18,6 +18,7 @@
     "**/dist/**",
     "**/coverage/**",
     "**/routeTree.gen.ts",
-    "**/schema.generated.ts"
+    "**/schema.generated.ts",
+    ".opencode/**"
   ]
 }
