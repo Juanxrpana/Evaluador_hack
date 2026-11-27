@@ -52,11 +52,16 @@ PostgreSQL 19 is the current stable release (released November 19, 2026).
 ### Docker Compose
 
 ```bash
+# Postgres only, for local pnpm development
 docker compose up -d postgres
+
+# Full app stack (Postgres + migrations + API + nginx web)
+docker compose up --build
 ```
 
 `compose.yaml` creates the `app` database and exposes port `5432`. The init script also creates
-`app_test` for optional real-Postgres tests.
+`app_test` for optional real-Postgres tests. The full stack serves the web app at
+`http://localhost:8080` and proxies `/api` to the API container.
 
 ### Podman without a Compose provider
 

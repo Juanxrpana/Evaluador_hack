@@ -37,7 +37,38 @@ is the compiler-checked boundary between the two.
 | Zod             | 4.6.7                                         |
 | Oxlint / Oxfmt  | 1.95.0 / 0.80.0                               |
 
-## Quick start
+## Run the full stack with Compose
+
+```bash
+docker compose up --build
+# Podman users:
+# podman compose -f compose.yaml up --build
+```
+
+Open **http://localhost:8080**. Anonymous visitors boot to `/login`; after sign-up or sign-in the
+root route sends them to the protected `/users` page.
+
+The stack contains:
+
+| Service    | Purpose                                                        |
+| ---------- | -------------------------------------------------------------- |
+| `postgres` | PostgreSQL 19 with the app and `app_test` databases            |
+| `migrate`  | One-shot Kysely migration runner; exits before the API starts  |
+| `api`      | Express + Better Auth + oRPC, built from `apps/api/Dockerfile` |
+| `web`      | Static Vite build served by nginx, proxying `/api` to the API  |
+
+The Compose secret is a local development default. For anything else:
+
+```bash
+BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
+PUBLIC_ORIGIN=http://localhost:8080 \
+docker compose up --build
+```
+
+`PUBLIC_ORIGIN` must match the browser origin because it is used for Better Auth and CORS. The
+Compose Postgres publishes port `5432`; stop any other local Postgres before starting the stack.
+
+## Local development
 
 ```bash
 cd ~/Evaluador_hack
@@ -133,6 +164,7 @@ it.
 │  │  │  │     ├─ user.mapper.ts
 │  │  │  │     └─ user.errors.ts
 │  │  │  └─ scripts/generate-openapi.ts
+│  │  ├─ Dockerfile                     # API build + deploy image
 │  │  ├─ test/
 │  │  │  ├─ migrations.test.ts           # up → down → up
 │  │  │  ├─ request-id.test.ts           # correlation header validation
@@ -146,6 +178,8 @@ it.
 │  │  │  └─ support/test-database.ts     # PGlite or TEST_DATABASE_URL
 │  │  └─ vitest.config.ts
 │  └─ web/
+│     ├─ Dockerfile                     # Vite build + nginx image
+│     ├─ nginx.conf                     # SPA fallback + /api proxy
 │     ├─ src/
 │     │  ├─ lib/auth-client.ts           # Better Auth React client
 │     │  ├─ lib/session.ts               # session query for route guards
@@ -167,7 +201,8 @@ it.
 │  ├─ architecture.md
 │  ├─ authentication.md
 │  └─ database.md
-├─ compose.yaml                          # PostgreSQL 19 for Docker Compose
+├─ .dockerignore
+├─ compose.yaml                          # full stack: postgres, migrate, api, web
 ├─ pnpm-workspace.yaml                   # workspaces + version catalog
 └─ tsconfig.base.json
 ```
@@ -221,6 +256,9 @@ Protected data
 Client-side validation is convenience; the server always re-validates. Better Auth owns credential
 validation, password hashing, session rotation, CSRF/origin checks, and auth rate limits. See
 [authentication.md](docs/authentication.md) for the schema and security details.
+
+The web root `/` redirects anonymous visitors to `/login` and authenticated visitors to `/users`.
+`/login` and `/signup` redirect authenticated users to `/users`.
 
 Public user creation is Better Auth sign-up. The transaction/service layer remains the pattern for
 application-domain writes; `UserService.create` is the reference multi-repository use case and is
@@ -381,6 +419,8 @@ git-ignored because it is derived from the contract.
   session pooling, **not** PgBouncer transaction mode.
 - `schema.generated.ts` is generated. Do not edit it by hand.
 - `apps/api/.env` contains local credentials and is ignored.
+- Compose falls back to a development-only `BETTER_AUTH_SECRET`; set a real 32+ character secret
+  before exposing the stack beyond localhost.
 
 ## Current boundaries
 
@@ -395,7 +435,9 @@ This is a starter, not a production deployment:
 - Rate limiting is process-local; use a shared store before horizontal scaling. The HTTP audit
   stream goes to stdout, so ship it to a durable, access-controlled store. Application-domain writes
   that use the transaction runner can also produce `audit_events` rows in PostgreSQL.
-- There is no CI workflow or application Dockerfile yet; `compose.yaml` only provisions Postgres.
+- The Compose stack is for local/demo use: it uses a development default secret, publishes
+  PostgreSQL on `5432`, and has no TLS termination or CI workflow. The images are multi-stage but
+  not production-hardened.
 - TanStack Table and TanStack Form are not included. React Hook Form is the form layer; add Table
   when a real dataset exists.
 - The schema has `users`, `sessions`, `accounts`, `verifications`, and `audit_events`. Add migrations

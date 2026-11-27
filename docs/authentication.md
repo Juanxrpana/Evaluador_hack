@@ -122,6 +122,7 @@ spoofed header.
   stale time.
 - `apps/web/src/routes/_authed.tsx` is a pathless guard. It resolves the session in `beforeLoad` and
   redirects anonymous visitors to `/login`.
+- `/` redirects anonymous visitors to `/login` and authenticated visitors to `/users`.
 - `/users` lives under `_authed`; `/login` and `/signup` redirect authenticated users to `/users`.
 - The root header uses `authClient.useSession()` for the name and sign-out control.
 
