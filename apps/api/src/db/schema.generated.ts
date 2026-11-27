@@ -76,6 +76,13 @@ export interface nota {
   texto: string
 }
 
+export interface permiso {
+  codigo: string
+  created_at: Generated<Timestamp>
+  descripcion: string | null
+  id: Generated<Int8>
+}
+
 export interface propuesta {
   created_at: Generated<Timestamp>
   documento: string | null
@@ -114,6 +121,18 @@ export interface recargos {
   propuesta_id: Int8
 }
 
+export interface rol {
+  created_at: Generated<Timestamp>
+  descripcion: string | null
+  id: Generated<Int8>
+  nombre: string
+}
+
+export interface rol_permiso {
+  permiso_id: Int8
+  rol_id: Int8
+}
+
 export interface sessions {
   created_at: Generated<Timestamp>
   expires_at: Timestamp
@@ -132,6 +151,7 @@ export interface users {
   id: Generated<string>
   image: string | null
   name: string
+  rol_id: Int8 | null
   updated_at: Generated<Timestamp>
 }
 
@@ -150,10 +170,13 @@ export interface DB {
   conocimiento: conocimiento
   estatus: estatus
   nota: nota
+  permiso: permiso
   propuesta: propuesta
   proveedor: proveedor
   proyecto: proyecto
   recargos: recargos
+  rol: rol
+  rol_permiso: rol_permiso
   sessions: sessions
   users: users
   verifications: verifications

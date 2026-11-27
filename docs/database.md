@@ -102,12 +102,20 @@ Files live in `apps/api/src/db/migrations` and are named with an ISO-like timest
 20261127130000_create_audit_events.ts
 20261127131000_add_authentication.ts
 20261127140000_create_core_domain_tables.ts
+20261127150000_add_roles_and_permissions.ts
 ```
 
 The core domain migration adds the evaluator domain: `proyecto`, `proveedor`,
 `propuesta`, `estatus`, `recargos`, `nota`, and `conocimiento`. The `conocimiento`
 table is the LLM knowledge base; it will get a `VECTOR(1024)` embedding column
 (pgvector, bge-m3) in a later migration once vector search is wired up.
+
+The roles and permissions migration adds the authorization model on top of
+Better Auth: catalog tables `rol` (seeded with `gestor`, `proyectista`,
+`supervisor`, `superadmin`) and `permiso`, the `rol_permiso` join table, and a
+nullable `users.rol_id` foreign key (a user without a role is pending
+assignment). Authorization lives outside the Better Auth field map, so the
+auth parity test is unaffected.
 
 Each file exports:
 
@@ -214,12 +222,15 @@ export interface DB {
   conocimiento: conocimiento;
   estatus: estatus;
   nota: nota;
+  permiso: permiso;
   propuesta: propuesta;
   proveedor: proveedor;
   proyecto: proyecto;
   recargos: recargos;
+  rol: rol;
+  rol_permiso: rol_permiso;
   sessions: sessions;
-  users: users;
+  users: users; // incl. rol_id: Int8 | null
   verifications: verifications;
 }
 ```
