@@ -71,6 +71,31 @@ function parseArgs(): { lote: string; salida: string } {
   };
 }
 
+/** 3.b: the repository field must point to the hackathon GitLab. */
+function repositorioOficial(): string {
+  const explicito = process.env.GIT_REPOSITORY;
+
+  if (explicito) {
+    return explicito;
+  }
+
+  try {
+    const remoto = execSync('git config --get remote.origin.url', { cwd: process.cwd() })
+      .toString()
+      .trim();
+
+    if (/github\.com/i.test(remoto)) {
+      console.warn(
+        `⚠️ remote.origin.url apunta a GitHub (${remoto}). El enunciado exige el GitLab del hackatón: define GIT_REPOSITORY para sobreescribirlo.`,
+      );
+    }
+
+    return remoto;
+  } catch {
+    return 'local';
+  }
+}
+
 const MIMES = new Map<string, string>([
   ['.pdf', 'application/pdf'],
   ['.png', 'image/png'],
@@ -202,6 +227,28 @@ const evaluaciones = new EvaluacionService({
   reader: new PostgresEvaluacionReader(db),
 });
 
+/** ISO 8601 WITH explicit timezone offset (the validator example uses -04:00). */
+function gruposDe<T>(elementos: T[], tamano: number): T[][] {
+  const salida: T[][] = [];
+
+  for (let indice = 0; indice < elementos.length; indice += tamano) {
+    salida.push(elementos.slice(indice, indice + tamano));
+  }
+
+  return salida;
+}
+
+function isoConZona(instante: Date): string {
+  const offsetMinutos = -instante.getTimezoneOffset();
+  const signo = offsetMinutos >= 0 ? '+' : '-';
+  const abs = Math.abs(offsetMinutos);
+  const horas = String(Math.floor(abs / 60)).padStart(2, '0');
+  const minutos = String(abs % 60).padStart(2, '0');
+  const local = new Date(instante.getTime() - offsetMinutos * 60_000);
+
+  return local.toISOString().slice(0, 19) + signo + horas + ':' + minutos;
+}
+
 // ---- Batch run ---------------------------------------------------------------
 
 const { lote, salida } = parseArgs();
@@ -209,17 +256,7 @@ const { lote, salida } = parseArgs();
 // 3.b: exact salida.json fields, computed from git and wall-clock time.
 const inicio = new Date();
 const commit = execSync('git rev-parse HEAD', { cwd: process.cwd() }).toString().trim();
-const repositorio =
-  process.env.GIT_REPOSITORY ??
-  (() => {
-    try {
-      return execSync('git config --get remote.origin.url', { cwd: process.cwd() })
-        .toString()
-        .trim();
-    } catch {
-      return 'local';
-    }
-  })();
+const repositorio = repositorioOficial();
 
 const raiz = readdirSync(lote);
 const carpetaPropuestas = raiz.includes('propuestas') ? path.join(lote, 'propuestas') : lote;
@@ -259,58 +296,81 @@ const propuestasExistentes = await propuestaReader.listByProyecto(proyecto.id);
 const documentosExistentes = await documentoReader.listByProyecto(proyecto.id);
 
 const procesados: Array<{ archivo: string; hora: string }> = [];
+/** propuestaId → file stem, for the salida.json ranking (3.b). */
+const archivoPorPropuesta = new Map<string, string>();
 
 // 3.d: bounded parallelism per file.
-for (const archivo of archivos) {
-  const mime = MIMES.get(path.extname(archivo).toLowerCase()) as string;
-  const nombrePropuesta = path.basename(archivo, path.extname(archivo));
-  const horaInicio = new Date().toISOString();
+const concurrencia = env.EVALUACION_CONCURRENCY;
+for (const grupo of gruposDe(archivos, concurrencia)) {
+  const resultados = await Promise.all(
+    grupo.map(async (archivo) => {
+      const mime = MIMES.get(path.extname(archivo).toLowerCase()) as string;
+      const nombrePropuesta = path.basename(archivo, path.extname(archivo));
 
-  const proveedor =
-    proveedoresExistentes.find((item) => item.nombre === nombrePropuesta) ??
-    (await proveedores.create({ nombre: nombrePropuesta }));
+      const proveedor =
+        proveedoresExistentes.find((item) => item.nombre === nombrePropuesta) ??
+        (await proveedores.create({ nombre: nombrePropuesta }));
 
-  const propuesta =
-    propuestasExistentes.find((item) => item.proveedorId === proveedor.id) ??
-    (await propuestas.create({ proyectoId: proyecto.id, proveedorId: proveedor.id }));
+      const propuesta =
+        propuestasExistentes.find((item) => item.proveedorId === proveedor.id) ??
+        (await propuestas.create({ proyectoId: proyecto.id, proveedorId: proveedor.id }));
 
-  const yaIngestada = documentosExistentes.some(
-    (documento: { nombre: string; propuestaId: string | null }) =>
-      documento.nombre === archivo && documento.propuestaId === propuesta.id,
+      archivoPorPropuesta.set(propuesta.id, nombrePropuesta);
+
+      const yaIngestada = documentosExistentes.some(
+        (documento: { nombre: string; propuestaId: string | null }) =>
+          documento.nombre === archivo && documento.propuestaId === propuesta.id,
+      );
+
+      if (!yaIngestada) {
+        await documentos.subir({
+          proyectoId: proyecto.id,
+          propuestaId: propuesta.id,
+          proveedorId: proveedor.id,
+          nombre: archivo,
+          mime,
+          contenidoBase64: readFileSync(path.join(carpetaPropuestas, archivo)).toString('base64'),
+        });
+      }
+
+      return { archivo, reutilizada: yaIngestada };
+    }),
   );
 
-  if (!yaIngestada) {
-    await documentos.subir({
-      proyectoId: proyecto.id,
-      propuestaId: propuesta.id,
-      proveedorId: proveedor.id,
-      nombre: archivo,
-      mime,
-      contenidoBase64: readFileSync(path.join(carpetaPropuestas, archivo)).toString('base64'),
-    });
+  for (const resultado of resultados) {
+    procesados.push({ archivo: resultado.archivo, hora: isoConZona(new Date()) });
+    console.log(
+      `ingestada: ${resultado.archivo} → ${resultado.reutilizada ? 'reutilizada' : 'nueva'}`,
+    );
   }
-
-  procesados.push({ archivo, hora: new Date().toISOString() });
-  console.log(
-    `ingestada: ${archivo} → ${horaInicio === '' ? 'nueva' : yaIngestada ? 'reutilizada' : 'nueva'}`,
-  );
 }
 
 // 4) the SAME engine the UI button runs.
 const evaluacion = await evaluaciones.lanzar(proyecto.id);
 
-// 5) ranking from the engine verdicts: valid best-first, then discarded.
-const ranking: string[] = (evaluacion.informe?.tablaComparativa ?? [])
-  .slice()
-  .sort((a, b) => (a.decision === 'descartada' ? 1 : 0) - (b.decision === 'descartada' ? 1 : 0))
-  .map((fila) => fila.proveedor);
+// 5) ranking per the enunciado: EVERY proposal, identified by the FILE NAME
+// without extension (never the supplier name), valid best-first, then
+// discarded. The engine's informe.ranking defines the ORDER.
+const ranking: string[] = [];
+const vistas = new Set<string>();
+
+for (const fila of evaluacion.informe?.ranking ?? []) {
+  const archivo = archivoPorPropuesta.get(fila.propuestaId);
+
+  if (!archivo || vistas.has(archivo)) {
+    continue;
+  }
+
+  vistas.add(archivo);
+  ranking.push(archivo);
+}
 
 const salidaDatos = {
   reto: 'propuesta_servicios',
   repositorio,
   commit,
-  inicio: inicio.toISOString(),
-  fin: new Date().toISOString(),
+  inicio: isoConZona(inicio),
+  fin: isoConZona(new Date()),
   procesados,
   ranking,
 };
