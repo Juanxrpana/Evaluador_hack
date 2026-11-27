@@ -1,0 +1,38 @@
+{
+  "name": "monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @repo/contracts build && pnpm --parallel --filter @repo/contracts --filter @repo/api --filter @repo/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm --filter @repo/contracts build && pnpm -r typecheck",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "test": "pnpm --filter @repo/contracts build && pnpm -r --if-present test",
+    "db:migrate": "pnpm --filter @repo/api db:migrate",
+    "db:rollback": "pnpm --filter @repo/api db:rollback",
+    "db:status": "pnpm --filter @repo/api db:status",
+    "db:types": "pnpm --filter @repo/api db:types",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "openapi": "pnpm --filter @repo/contracts build && pnpm --filter @repo/api openapi:generate"
+  },
+  "devDependencies": {
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "26.13.1",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=26.0.0",
+    "pnpm": ">=12.0.0"
+  },
+  "packageManager": "pnpm@12.23.0"
+}

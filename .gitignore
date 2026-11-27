@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+apps/api/openapi.json
+.vite/
+.DS_Store
+*.log
+pnpm-debug.log*
+.tanstack/

@@ -1,0 +1,39 @@
+{
+  "name": "@repo/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsr generate && tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsr generate && tsc -b",
+    "routes:generate": "tsr generate"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "catalog:",
+    "@orpc/client": "catalog:",
+    "@orpc/openapi-client": "catalog:",
+    "@orpc/tanstack-query": "catalog:",
+    "@repo/contracts": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-router": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-hook-form": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@tanstack/react-query-devtools": "catalog:",
+    "@tanstack/react-router-devtools": "catalog:",
+    "@tanstack/router-cli": "catalog:",
+    "@tanstack/router-core": "catalog:",
+    "@tanstack/router-plugin": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

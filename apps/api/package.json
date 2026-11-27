@@ -1,0 +1,42 @@
+{
+  "name": "@repo/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "node --env-file-if-exists=.env src/db/migrate.ts up",
+    "db:rollback": "node --env-file-if-exists=.env src/db/migrate.ts down",
+    "db:status": "node --env-file-if-exists=.env src/db/migrate.ts status",
+    "db:types": "node src/db/generate-types.ts",
+    "openapi:generate": "node --env-file-if-exists=.env src/scripts/generate-openapi.ts"
+  },
+  "dependencies": {
+    "@orpc/contract": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/zod": "catalog:",
+    "@repo/contracts": "workspace:*",
+    "cors": "catalog:",
+    "express": "catalog:",
+    "helmet": "catalog:",
+    "kysely": "catalog:",
+    "pg": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "catalog:",
+    "@types/cors": "catalog:",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "kysely-typegen": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
