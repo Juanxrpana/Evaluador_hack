@@ -299,9 +299,8 @@ function InformePage() {
     const ahora = new Date();
     const salida = {
       reto: 'propuesta_servicios',
-      repositorio:
-        import.meta.env.VITE_GIT_REPOSITORY ?? 'https://github.com/Juanxrpana/Evaluador_hack',
-      commit: import.meta.env.VITE_GIT_COMMIT ?? 'local',
+      repositorio: __GIT_REPOSITORY__,
+      commit: __GIT_COMMIT__,
       inicio: isoConZona(ahora),
       fin: isoConZona(ahora),
       procesados,
