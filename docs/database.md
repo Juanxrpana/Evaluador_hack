@@ -11,6 +11,7 @@ SQL DDL.
 | API shape and route metadata              | oRPC contract         | `packages/contracts/src/contract.ts`                  |
 | Table structure, indexes, constraints     | PostgreSQL migrations | `apps/api/src/db/migrations/*`                        |
 | Typed SQL query surface                   | Kysely                | `apps/api/src/db/schema.generated.ts`                 |
+| Auth model → column mapping               | Better Auth config    | `apps/api/src/auth/auth.ts`                           |
 | Row → API translation                     | Repository mapper     | `apps/api/src/modules/users/user.mapper.ts`           |
 | Transaction boundary                      | Application service   | `apps/api/src/modules/users/user.service.ts`          |
 | Durable success audit                     | Audit adapter         | `apps/api/src/modules/audit/postgres-audit.writer.ts` |
@@ -82,8 +83,9 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
 DATABASE_POOL_MAX=10
 ```
 
-The API verifies the connection with `select 1` before listening. If the database is missing or
-unreachable, startup fails.
+Authentication also requires `BETTER_AUTH_SECRET` (32+ characters) and `BETTER_AUTH_URL`; see
+[authentication.md](authentication.md). The API verifies the connection with `select 1` before
+listening. If the database is missing or unreachable, startup fails.
 
 ## Migrations
 
@@ -92,6 +94,8 @@ Files live in `apps/api/src/db/migrations` and are named with an ISO-like timest
 ```text
 20261127120000_create_users.ts
 20261127121000_add_users_created_at_index.ts
+20261127130000_create_audit_events.ts
+20261127131000_add_authentication.ts
 ```
 
 Each file exports:
@@ -139,9 +143,21 @@ pnpm db:status     # show applied/pending
 The file is committed so typecheck and builds do not require a database. It is ignored by Oxlint and
 Oxfmt because it is generated. Do not edit it by hand.
 
-The generated file contains the `users` and `audit_events` tables and the `DB` type:
+The generated file contains the `users` table, the Better Auth tables, `audit_events`, and the `DB`
+type:
 
 ```ts
+export interface accounts {
+  access_token: string | null;
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  password: string | null;
+  provider_id: string;
+  user_id: string;
+  // ...token and timestamp columns omitted for brevity
+}
+
 export interface audit_events {
   action: string;
   actor_id: string | null;
@@ -153,20 +169,58 @@ export interface audit_events {
   trace_id: string | null;
 }
 
+export interface sessions {
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  token: string;
+  user_id: string;
+  // ...ip_address, user_agent, updated_at
+}
+
 export interface users {
   created_at: Generated<Timestamp>;
   email: string;
+  email_verified: Generated<boolean>;
   id: Generated<string>;
+  image: string | null;
   name: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface verifications {
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  identifier: string;
+  updated_at: Generated<Timestamp>;
+  value: string;
 }
 
 export interface DB {
+  accounts: accounts;
   audit_events: audit_events;
+  sessions: sessions;
   users: users;
+  verifications: verifications;
 }
 ```
 
 Run `pnpm db:types` after every migration change.
+
+## Better Auth schema
+
+The `users` table is the single identity table. The authentication migration adds `email_verified`,
+`image`, and `updated_at`, then creates `sessions`, `accounts`, and `verifications`. Foreign keys
+use `uuid` because `users.id` is a UUID and `userSchema` validates it with `z.uuid()`.
+
+`apps/api/src/auth/auth.ts` maps Better Auth's camelCase model fields onto the snake_case columns.
+This mapping is part of the application schema contract; renaming a column means updating the map
+and the migration together.
+
+Better Auth's CLI can generate or apply its own migrations, but this project does not use that path
+for deployments. `auth migrate` would bypass Kysely's migration history and the reversible
+migration test. The CLI and `getMigrations(auth.options)` are reference/parity tools only.
 
 ## Read and write repositories
 
@@ -204,9 +258,9 @@ function toUser(row: Selectable<DB['users']>): User {
 - If a column is renamed or its nullability changes, the mapper fails to compile.
 - If the API schema changes, the mapper’s return type fails to compile.
 
-`PostgresUserWriter` maps only the `users_email_key` `23505` violation to
-`EmailAlreadyExistsError`; the oRPC router turns that into HTTP 409. Other unique violations keep
-their raw PostgreSQL error.
+The internal reference `PostgresUserWriter` maps only the `users_email_key` `23505` violation to
+`EmailAlreadyExistsError`; public creation and duplicate-email behavior belong to Better Auth.
+The reader is the only user adapter used by the exposed API.
 
 ## Transactions and durable audit
 
@@ -256,16 +310,21 @@ pnpm test
 The migration test performs exactly:
 
 1. `migrateToLatest()`.
-2. Assert `users` and `audit_events` exist.
+2. Assert `users`, `sessions`, `accounts`, `verifications`, and `audit_events` exist.
 3. `migrateTo(NO_MIGRATIONS)`.
-4. Assert both tables are gone and migration history is empty.
+4. Assert every table is gone and migration history is empty.
 5. `migrateToLatest()` again.
-6. Assert `users` and `audit_events` exist.
+6. Assert every table exists again.
 
-The adapter test then inserts a user through the transaction runner, validates the result with
+The adapter test inserts a user through the transaction runner, validates the result with
 `userSchema`, lists it through `PostgresUserReader`, and verifies duplicate emails raise the domain
 error. A separate transaction test proves that a thrown error removes both the user and its
 `audit_events` row. The service test uses fake ports and a fake runner, so it needs no database.
+
+The auth test asserts that `getMigrations(auth.options)` reports no pending Better Auth tables or
+columns, then signs up through the real handler and resolves the session cookie. The parity
+assertion is the canary for Better Auth upgrades: a new required column fails CI until a Kysely
+migration and the field map are updated.
 
 ### Real PostgreSQL 19 parity
 
@@ -291,7 +350,8 @@ production-fidelity check.
   `idle_in_transaction_session_timeout`; migrations deliberately keep no statement timeout.
 - Transactions hold one pool connection. Keep them short and never perform external I/O inside.
 - Write repositories require `Transaction<DB>`; read repositories use the root connection.
-- Durable audit is written in the same transaction as the domain change and is success-only.
+- The reference application write writes its durable audit row in the same transaction and is
+  success-only. Better Auth owns its own user/account/session writes.
 - No nested transactions or ALS request transactions. Compose repositories in one service callback.
 - True ACID stops at one PostgreSQL database. A future service split uses an outbox and Saga, not 2PC.
 - No auto-migrations.
@@ -303,6 +363,8 @@ production-fidelity check.
 - DB constraints are integrity guarantees, not a second API validator.
 
 ## Adding a table
+
+For an application-domain table:
 
 1. Add a timestamped migration with `up` and `down`.
 2. Run `pnpm db:migrate`.

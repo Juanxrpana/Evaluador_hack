@@ -27,12 +27,18 @@ describe('database migrations', () => {
     expect(applied.results?.every((result) => result.status === 'Success')).toBe(true);
     expect(await hasTable('users')).toBe(true);
     expect(await hasTable('audit_events')).toBe(true);
+    expect(await hasTable('sessions')).toBe(true);
+    expect(await hasTable('accounts')).toBe(true);
+    expect(await hasTable('verifications')).toBe(true);
 
     const reversed = await migrator.migrateTo(NO_MIGRATIONS);
     expect(reversed.error).toBeUndefined();
     expect(reversed.results?.every((result) => result.status === 'Success')).toBe(true);
     expect(await hasTable('users')).toBe(false);
     expect(await hasTable('audit_events')).toBe(false);
+    expect(await hasTable('sessions')).toBe(false);
+    expect(await hasTable('accounts')).toBe(false);
+    expect(await hasTable('verifications')).toBe(false);
 
     const historyAfterReversal = await migrator.getMigrations();
     expect(historyAfterReversal.every((migration) => migration.executedAt === undefined)).toBe(
@@ -44,5 +50,8 @@ describe('database migrations', () => {
     expect(reapplied.results?.every((result) => result.status === 'Success')).toBe(true);
     expect(await hasTable('users')).toBe(true);
     expect(await hasTable('audit_events')).toBe(true);
+    expect(await hasTable('sessions')).toBe(true);
+    expect(await hasTable('accounts')).toBe(true);
+    expect(await hasTable('verifications')).toBe(true);
   });
 });

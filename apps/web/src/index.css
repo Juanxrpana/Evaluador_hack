@@ -82,6 +82,9 @@ code {
 
 .app-nav {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.35rem;
 }
 
@@ -101,6 +104,30 @@ code {
 .app-nav a.active {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.session-name {
+  color: var(--muted);
+  padding: 0 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.nav-button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.45rem 0.8rem;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nav-button:hover {
+  background: var(--surface);
+  color: var(--text);
 }
 
 .app-main {
@@ -167,7 +194,7 @@ h1 {
   font-weight: 700;
 }
 
-.user-form {
+.form-panel {
   display: grid;
   gap: 0.9rem;
   border: 1px solid var(--border);
@@ -226,6 +253,16 @@ button[type='submit'] {
 button[type='submit']:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+.auth-page {
+  max-width: 30rem;
+}
+
+.auth-switch {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .user-list {

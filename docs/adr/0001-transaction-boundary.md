@@ -67,6 +67,14 @@ keeps that guard checked by `pnpm typecheck`.
 errors to oRPC errors, emits the post-commit stdout success audit, and never opens a transaction.
 Repositories never open transactions either; only the runner does.
 
+### Authentication boundary
+
+Better Auth owns credential, account, and session writes through its own adapter and transaction.
+The exposed `GET /users` read uses `UserService.list`. `UserService.create` remains the reference
+application write use case for the multi-repository transaction pattern; it is not exposed while
+Better Auth owns public sign-up. This ADR applies to application-domain writes, not to Better Auth's
+internal writes.
+
 ### Durable audit is success-only and atomic
 
 `audit_events` rows are written in the same transaction as the domain change. A rollback removes

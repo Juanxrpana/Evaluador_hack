@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { createUserSchema } from '@repo/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMigrator } from '../src/db/migrator.ts';
 import { createTransactionRunner } from '../src/db/transaction.ts';
@@ -10,6 +9,7 @@ import type {
   UserTransaction,
   UserTransactionRunner,
 } from '../src/modules/users/user.transaction.ts';
+import type { CreateUserInput } from '../src/modules/users/user.writer.ts';
 import { createTestDatabase, type TestDatabase } from './support/test-database.ts';
 
 let testDb: TestDatabase;
@@ -37,10 +37,10 @@ afterAll(async () => {
 
 describe('transaction boundary', () => {
   it('commits the user and audit row together', async () => {
-    const input = createUserSchema.parse({
+    const input: CreateUserInput = {
       name: 'Grace Hopper',
       email: `commit-${randomUUID()}@example.com`,
-    });
+    };
 
     const user = await runInTransaction(async ({ users, audit }) => {
       const created = await users.create(input);
@@ -79,9 +79,7 @@ describe('transaction boundary', () => {
 
     await expect(
       runInTransaction(async ({ users, audit }) => {
-        const created = await users.create(
-          createUserSchema.parse({ name: 'Rollback User', email }),
-        );
+        const created = await users.create({ name: 'Rollback User', email });
         rolledBackUserId = created.id;
 
         await audit.record({

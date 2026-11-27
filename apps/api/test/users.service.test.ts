@@ -1,9 +1,9 @@
-import type { CreateUserInput, User } from '@repo/contracts';
+import type { User } from '@repo/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditRecord, AuditWriter } from '../src/modules/audit/audit.repository.ts';
 import { UserService } from '../src/modules/users/user.service.ts';
 import type { UserTransactionRunner } from '../src/modules/users/user.transaction.ts';
-import type { UserWriter } from '../src/modules/users/user.writer.ts';
+import type { CreateUserInput, UserWriter } from '../src/modules/users/user.writer.ts';
 
 const user: User = {
   id: '6f1b6a3e-6f4f-4f7a-9a3e-2f2f2f2f2f2f',

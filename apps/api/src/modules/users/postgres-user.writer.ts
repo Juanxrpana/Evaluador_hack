@@ -1,9 +1,9 @@
-import type { CreateUserInput, User } from '@repo/contracts';
+import type { User } from '@repo/contracts';
 import type { Transaction } from 'kysely';
 import type { DB } from '../../db/schema.generated.ts';
 import { EmailAlreadyExistsError } from './user.errors.ts';
 import { toUser } from './user.mapper.ts';
-import type { UserWriter } from './user.writer.ts';
+import type { CreateUserInput, UserWriter } from './user.writer.ts';
 
 /**
  * Write adapter. Requiring Transaction<DB> makes it a compile error to pass

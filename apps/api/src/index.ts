@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { sql } from 'kysely';
 import { createApp } from './app.ts';
+import { createAuth } from './auth/auth.ts';
 import { env } from './config/env.ts';
 import { createDatabase } from './db/client.ts';
 import { createTransactionRunner } from './db/transaction.ts';
@@ -39,6 +40,11 @@ const runInUserTransaction: UserTransactionRunner = createTransactionRunner<User
 );
 
 const app = createApp({
+  auth: createAuth(db, {
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL,
+    trustedOrigins: [env.CORS_ORIGIN],
+  }),
   users: new UserService(new PostgresUserReader(db), runInUserTransaction),
 });
 const server = createServer(app);
