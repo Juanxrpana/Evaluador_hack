@@ -18,6 +18,8 @@ import { Route as AuthedProyectosRouteImport } from './routes/_authed/proyectos'
 import { Route as AuthedUsersRouteImport } from './routes/_authed/users'
 import { Route as AuthedProyectosIndexRouteImport } from './routes/_authed/proyectos.index'
 import { Route as AuthedProyectosIdRouteImport } from './routes/_authed/proyectos.$id'
+import { Route as AuthedProyectosIdIndexRouteImport } from './routes/_authed/proyectos.$id.index'
+import { Route as AuthedProyectosIdInformeRouteImport } from './routes/_authed/proyectos.$id.informe'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -63,6 +65,17 @@ const AuthedProyectosIdRoute = AuthedProyectosIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthedProyectosRoute,
 } as any)
+const AuthedProyectosIdIndexRoute = AuthedProyectosIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthedProyectosIdRoute,
+} as any)
+const AuthedProyectosIdInformeRoute =
+  AuthedProyectosIdInformeRouteImport.update({
+    id: '/informe',
+    path: '/informe',
+    getParentRoute: () => AuthedProyectosIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -71,8 +84,10 @@ export interface FileRoutesByFullPath {
   '/proveedores': typeof AuthedProveedoresRoute
   '/proyectos': typeof AuthedProyectosRouteWithChildren
   '/users': typeof AuthedUsersRoute
-  '/proyectos/$id': typeof AuthedProyectosIdRoute
+  '/proyectos/$id': typeof AuthedProyectosIdRouteWithChildren
   '/proyectos/': typeof AuthedProyectosIndexRoute
+  '/proyectos/$id/informe': typeof AuthedProyectosIdInformeRoute
+  '/proyectos/$id/': typeof AuthedProyectosIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -80,8 +95,9 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/proveedores': typeof AuthedProveedoresRoute
   '/users': typeof AuthedUsersRoute
-  '/proyectos/$id': typeof AuthedProyectosIdRoute
   '/proyectos': typeof AuthedProyectosIndexRoute
+  '/proyectos/$id/informe': typeof AuthedProyectosIdInformeRoute
+  '/proyectos/$id': typeof AuthedProyectosIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -92,8 +108,10 @@ export interface FileRoutesById {
   '/_authed/proveedores': typeof AuthedProveedoresRoute
   '/_authed/proyectos': typeof AuthedProyectosRouteWithChildren
   '/_authed/users': typeof AuthedUsersRoute
-  '/_authed/proyectos/$id': typeof AuthedProyectosIdRoute
+  '/_authed/proyectos/$id': typeof AuthedProyectosIdRouteWithChildren
   '/_authed/proyectos/': typeof AuthedProyectosIndexRoute
+  '/_authed/proyectos/$id/informe': typeof AuthedProyectosIdInformeRoute
+  '/_authed/proyectos/$id/': typeof AuthedProyectosIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -106,6 +124,8 @@ export interface FileRouteTypes {
     | '/users'
     | '/proyectos/$id'
     | '/proyectos/'
+    | '/proyectos/$id/informe'
+    | '/proyectos/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -113,8 +133,9 @@ export interface FileRouteTypes {
     | '/signup'
     | '/proveedores'
     | '/users'
-    | '/proyectos/$id'
     | '/proyectos'
+    | '/proyectos/$id/informe'
+    | '/proyectos/$id'
   id:
     | '__root__'
     | '/'
@@ -126,6 +147,8 @@ export interface FileRouteTypes {
     | '/_authed/users'
     | '/_authed/proyectos/$id'
     | '/_authed/proyectos/'
+    | '/_authed/proyectos/$id/informe'
+    | '/_authed/proyectos/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -200,16 +223,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProyectosIdRouteImport
       parentRoute: typeof AuthedProyectosRoute
     }
+    '/_authed/proyectos/$id/': {
+      id: '/_authed/proyectos/$id/'
+      path: '/'
+      fullPath: '/proyectos/$id/'
+      preLoaderRoute: typeof AuthedProyectosIdIndexRouteImport
+      parentRoute: typeof AuthedProyectosIdRoute
+    }
+    '/_authed/proyectos/$id/informe': {
+      id: '/_authed/proyectos/$id/informe'
+      path: '/informe'
+      fullPath: '/proyectos/$id/informe'
+      preLoaderRoute: typeof AuthedProyectosIdInformeRouteImport
+      parentRoute: typeof AuthedProyectosIdRoute
+    }
   }
 }
 
+interface AuthedProyectosIdRouteChildren {
+  AuthedProyectosIdInformeRoute: typeof AuthedProyectosIdInformeRoute
+  AuthedProyectosIdIndexRoute: typeof AuthedProyectosIdIndexRoute
+}
+
+const AuthedProyectosIdRouteChildren: AuthedProyectosIdRouteChildren = {
+  AuthedProyectosIdInformeRoute: AuthedProyectosIdInformeRoute,
+  AuthedProyectosIdIndexRoute: AuthedProyectosIdIndexRoute,
+}
+
+const AuthedProyectosIdRouteWithChildren =
+  AuthedProyectosIdRoute._addFileChildren(AuthedProyectosIdRouteChildren)
+
 interface AuthedProyectosRouteChildren {
-  AuthedProyectosIdRoute: typeof AuthedProyectosIdRoute
+  AuthedProyectosIdRoute: typeof AuthedProyectosIdRouteWithChildren
   AuthedProyectosIndexRoute: typeof AuthedProyectosIndexRoute
 }
 
 const AuthedProyectosRouteChildren: AuthedProyectosRouteChildren = {
-  AuthedProyectosIdRoute: AuthedProyectosIdRoute,
+  AuthedProyectosIdRoute: AuthedProyectosIdRouteWithChildren,
   AuthedProyectosIndexRoute: AuthedProyectosIndexRoute,
 }
 
