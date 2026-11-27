@@ -9,5 +9,7 @@ interface ImportMeta {
 }
 
 /** Injected by vite.config.ts from the current Git checkout. */
-declare const __GIT_COMMIT__: string;
-declare const __GIT_REPOSITORY__: string;
+declare module 'virtual:git-info' {
+  export const commit: string;
+  export const repository: string;
+}

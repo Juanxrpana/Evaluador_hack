@@ -2,6 +2,7 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import type { Estatus, Nota, Propuesta, Proveedor, Recargo } from '@repo/contracts';
+import { commit as gitCommit, repository as gitRepository } from 'virtual:git-info';
 import { Vacio } from '../../components/ui';
 import { aCentavos, deCentavos, fecha, monto } from '../../lib/format';
 import { orpc } from '../../lib/orpc';
@@ -299,8 +300,8 @@ function InformePage() {
     const ahora = new Date();
     const salida = {
       reto: 'propuesta_servicios',
-      repositorio: __GIT_REPOSITORY__,
-      commit: __GIT_COMMIT__,
+      repositorio: gitRepository,
+      commit: gitCommit,
       inicio: isoConZona(ahora),
       fin: isoConZona(ahora),
       procesados,
