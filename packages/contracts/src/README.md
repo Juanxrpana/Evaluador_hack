@@ -6,7 +6,8 @@ Contrato oRPC que describe rutas, métodos, entradas y salidas. El API lo implem
 
 ## Interface
 
-- `contract`: rutas `health`, `users`, `proyectos`, `proveedores`, `propuestas`, `recargos`, `notas`, `estatus`, `documentos`, `conocimiento`, `chat`.
+- `contract`: rutas `health`, `users`, `proyectos`, `proveedores`, `propuestas`, `recargos`, `notas`, `estatus`, `documentos`, `conocimiento`, `chat`, `tasa`.
+- `contract.tasa.bcv`: `GET /tasa/bcv`, salida `tasaBcvSchema`; tasa BCV de referencia (los montos se guardan en USD).
 - `ApiContract = typeof contract`.
 - `index.ts`: re-exporta `contract`, `ApiContract`, los esquemas y `ApiClient`.
 

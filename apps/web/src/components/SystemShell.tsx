@@ -9,6 +9,7 @@ import { MarkIcon, MoonIcon, SunIcon } from './Icons';
 const NAV = [
   { to: '/proyectos', label: 'Proyectos' },
   { to: '/proveedores', label: 'Proveedores' },
+  { to: '/correos', label: 'Correos' },
   { to: '/users', label: 'Usuarios' },
 ] as const;
 
@@ -109,7 +110,7 @@ export function SystemShell({ children }: { children: ReactNode }) {
           adjudica: ordena, explica y deja rastro.
         </p>
         <p className="footer__meta">
-          Sesión con Better Auth · Cifrado en reposo · Tasa BCV guardada con fuente y fecha
+          Sesión con Better Auth · Documentos en PostgreSQL · Lectura asistida por IA
         </p>
       </footer>
     </div>

@@ -8,6 +8,7 @@ import type { Auth } from './auth/auth.ts';
 import { env } from './config/env.ts';
 import type { ChatService } from './modules/chat/chat.service.ts';
 import type { ConocimientoListService } from './modules/documentos/conocimiento.list.ts';
+import type { CorreoService } from './modules/correos/correo.service.ts';
 import type { DocumentoService } from './modules/documentos/documento.service.ts';
 import type { EvaluacionService } from './modules/evaluaciones/evaluacion.service.ts';
 import type { EstatusService } from './modules/estatus/estatus.service.ts';
@@ -20,6 +21,7 @@ import type { ProyectoService } from './modules/proyectos/proyecto.service.ts';
 import type { ProveedorService } from './modules/proveedores/proveedor.service.ts';
 import type { RecargoReader } from './modules/recargos/recargo.reader.ts';
 import type { UsuarioService } from './modules/usuarios/usuario.service.ts';
+import type { TasaBcvService } from './modules/tasa/tasa-bcv.service.ts';
 import type { UserService } from './modules/users/user.service.ts';
 import type { AlertaAntecedente } from '@repo/contracts';
 import { auditMutations } from './observability/audit.ts';
@@ -50,6 +52,8 @@ export interface AppDependencies {
   decisiones: DecisionFinalService;
   alertas: { porProveedor(proveedorId: string): Promise<AlertaAntecedente[]> };
   permisosDe: (usuarioId: string) => Promise<Set<string>>;
+  tasa: TasaBcvService;
+  correos: CorreoService;
 }
 
 export function createApp(dependencies: AppDependencies) {

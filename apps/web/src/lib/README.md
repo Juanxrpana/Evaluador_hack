@@ -11,7 +11,7 @@ Infraestructura del cliente: transporte oRPC, sesión Better Auth, query client,
 - `session.ts`: `sessionQueryOptions` (query de sesión).
 - `query-client.ts`: `queryClient`.
 - `errors.ts`: `messageOf(cause)` para mostrar errores de mutación.
-- `format.ts`: `fecha`, `fechaCorta`, `monto`, `numeroDe`.
+- `format.ts`: `fecha`, `fechaCorta`, `monto`, `numeroDe`, `aCentavos`, `deCentavos`.
 - `theme.ts`: `Tema` (`dark` | `light`), `useTema()`.
 
 ## Invariants

@@ -75,6 +75,14 @@ const envSchema = z.object({
   MERCADO_CACHE_HORAS: z.coerce.number().int().positive().default(24),
   // Batch evaluation: parallel proposals per evaluation run.
   EVALUACION_CONCURRENCY: z.coerce.number().int().positive().default(4),
+  // IMAP (correo scanning). Leave IMAP_HOST empty to disable the module;
+  // the password is an application password, never the account primary one.
+  IMAP_HOST: z.string().default(''),
+  IMAP_PORT: z.coerce.number().int().positive().default(993),
+  IMAP_TLS: z.stringbool().default(true),
+  IMAP_USER: z.string().default(''),
+  IMAP_PASSWORD: z.string().default(''),
+  IMAP_CORREOS_LIMITE: z.coerce.number().int().positive().default(50),
 });
 
 export const env = envSchema.parse(process.env);

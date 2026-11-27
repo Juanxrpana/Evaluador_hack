@@ -10,6 +10,8 @@ import { LocalBgeM3EmbeddingClient } from './modules/ai/local-bge.embedding.clie
 import { OpenRouterLlmClient } from './modules/ai/openrouter-llm.client.ts';
 import { PostgresAuditWriter } from './modules/audit/postgres-audit.writer.ts';
 import { ChatService } from './modules/chat/chat.service.ts';
+import { CorreoService } from './modules/correos/correo.service.ts';
+import { ImapCorreoProvider } from './modules/correos/imap.correo.provider.ts';
 import type {
   DocumentoTransaction,
   DocumentoTransactionRunner,
@@ -92,6 +94,7 @@ import { PostgresUserReader } from './modules/users/postgres-user.reader.ts';
 import { PostgresUserWriter } from './modules/users/postgres-user.writer.ts';
 import type { UserTransaction, UserTransactionRunner } from './modules/users/user.transaction.ts';
 import { UserService } from './modules/users/user.service.ts';
+import { TasaBcvService } from './modules/tasa/tasa-bcv.service.ts';
 import { logger } from './observability/logger.ts';
 import { getRequestContext } from './observability/request-context.ts';
 
@@ -234,6 +237,9 @@ const chat: ChatService = new ChatService(
   llm,
 );
 
+// Correo scanning: IMAP adapter chosen here; tests can inject a fake provider.
+const correos = new CorreoService(new ImapCorreoProvider());
+
 const notas = new NotaService(new PostgresNotaReader(db), runInNotaTransaction, propuestaReader);
 const estatus = new EstatusService(
   new PostgresEstatusReader(db),
@@ -304,6 +310,7 @@ async function permisosDe(usuarioId: string): Promise<Set<string>> {
 
   return new Set(filas.map((fila) => fila.codigo));
 }
+const tasa = new TasaBcvService();
 
 const app = createApp({
   auth: createAuth(db, {
@@ -328,6 +335,8 @@ const app = createApp({
   decisiones,
   alertas: { porProveedor: (id: string) => evaluaciones.alertasPorProveedor(id) },
   permisosDe,
+  tasa,
+  correos,
 });
 const server = createServer(app);
 

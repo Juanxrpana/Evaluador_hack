@@ -18,7 +18,8 @@ Esquemas Zod que definen la forma pública de la API. Son la fuente única para 
   - Documento: `documentoSchema`, `documentoUploadInput`, `documentoUploadResponse`.
   - Conocimiento: `conocimientoSchema`.
   - Chat: `fuenteSchema`, `chatResponseSchema`, `chatAskInput`.
-  - Tipos inferidos: `Proyecto`, `Proveedor`, `Propuesta`, `Recargo`, `Nota`, `Estatus`, `Documento`, `Conocimiento`, `ChatResponse`, etc.
+  - Tasa: `tasaBcvSchema` (valor decimal, fuente, fecha ISO, verificada).
+  - Tipos inferidos: `Proyecto`, `Proveedor`, `Propuesta`, `Recargo`, `Nota`, `Estatus`, `Documento`, `Conocimiento`, `ChatResponse`, `TasaBcv`, etc.
 
 ## Invariants
 

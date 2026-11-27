@@ -42,7 +42,7 @@ La extracción con IA propone datos; el contrato Zod, la base de datos y las reg
 - No hay UI de roles ni permisos: la base ya tiene roles, pero el front no los expone ni los aplica.
 - No hay endpoints de ranking, revisión o dictamen; el front no debe simular que existen.
 - No se promete TCO completo (energía, mantenimiento, garantía extendida) ni exactitud perfecta de OCR.
-- Los documentos se envían a un servicio externo de lectura; el cifrado en reposo usa una llave en variable de entorno.
+- Los documentos se envían a un servicio externo de lectura (OpenRouter). El cifrado en reposo aún no está implementado; es un pendiente de seguridad (F.2).
 - Interfaz en español de Venezuela, responsive mobile-first, con modo oscuro por defecto y modo claro.
 - Abierto: catálogo legible de estados, política de roles, tasa BCV y formato de dictamen.
 

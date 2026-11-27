@@ -4,6 +4,12 @@ import type { Auth } from '../auth/auth.ts';
 import { LlmError } from '../modules/ai/llm.client.ts';
 import type { ChatService } from '../modules/chat/chat.service.ts';
 import { ProyectoNoEncontradoChatError } from '../modules/chat/chat.service.ts';
+import type { CorreoService } from '../modules/correos/correo.service.ts';
+import {
+  AdjuntoDemasiadoGrandeError,
+  CorreoNoDisponibleError,
+  CorreoNoEncontradoError,
+} from '../modules/correos/correo.service.ts';
 import {
   DocumentoDemasiadoGrandeError,
   DocumentoVacioError,
@@ -37,6 +43,8 @@ import { NotaNoEncontradaError } from '../modules/notas/nota.service.ts';
 import type { RecargoReader } from '../modules/recargos/recargo.reader.ts';
 import type { ConocimientoListService } from '../modules/documentos/conocimiento.list.ts';
 import { DocumentoNoEncontradoError } from '../modules/documentos/documento.service.ts';
+import type { TasaBcvService } from '../modules/tasa/tasa-bcv.service.ts';
+import { TasaNoDisponibleError } from '../modules/tasa/tasa-bcv.service.ts';
 
 export interface ApiContext {
   session: Awaited<ReturnType<Auth['api']['getSession']>>;
@@ -61,6 +69,8 @@ export interface RouterDependencies {
   alertas: { porProveedor(proveedorId: string): Promise<AlertaAntecedente[]> };
   /** User permission codes (E.2.b), resolved per request. */
   permisosDe: (usuarioId: string) => Promise<Set<string>>;
+  tasa: TasaBcvService;
+  correos: CorreoService;
 }
 
 /** Expected domain failures become typed 4xx responses; nothing else escapes. */
@@ -77,7 +87,8 @@ function mapDomainError(error: unknown): never {
     error instanceof NotaNoEncontradaError ||
     error instanceof EstatusNoEncontradoError ||
     error instanceof UsuarioNoEncontradoError ||
-    error instanceof RolNoExisteError
+    error instanceof RolNoExisteError ||
+    error instanceof CorreoNoEncontradoError
   ) {
     throw new ORPCError('NOT_FOUND', { message: error.message });
   }
@@ -99,7 +110,8 @@ function mapDomainError(error: unknown): never {
     error instanceof DocumentoVacioError ||
     error instanceof DocumentoDemasiadoGrandeError ||
     error instanceof ContenidoIlegibleError ||
-    error instanceof ExtractorFallidoError
+    error instanceof ExtractorFallidoError ||
+    error instanceof AdjuntoDemasiadoGrandeError
   ) {
     throw new ORPCError('UNPROCESSABLE_CONTENT', { message: error.message });
   }
@@ -133,6 +145,14 @@ function mapDomainError(error: unknown): never {
     throw new ORPCError('NOT_FOUND', { message: error.message });
   }
 
+  if (error instanceof TasaNoDisponibleError) {
+    throw new ORPCError('SERVICE_UNAVAILABLE', { message: error.message });
+  }
+
+  if (error instanceof CorreoNoDisponibleError) {
+    throw new ORPCError('INTERNAL', { message: error.message });
+  }
+
   // Unknown failures keep the safe message but never lose their cause.
   getRequestLogger().error({ err: error }, 'unmapped domain error');
   throw new ORPCError('INTERNAL', { message: 'Unexpected server error' });
@@ -160,6 +180,8 @@ export function createRouter({
   decisiones,
   alertas,
   permisosDe,
+  tasa,
+  correos,
 }: RouterDependencies) {
   const os = implement(contract).$context<ApiContext>();
 
@@ -195,6 +217,17 @@ export function createRouter({
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     })),
+
+    tasa: {
+      bcv: os.tasa.bcv.use(authenticated).handler(async () => {
+        try {
+          const { tasa: actual } = await tasa.obtener();
+          return actual;
+        } catch (error) {
+          return mapDomainError(error);
+        }
+      }),
+    },
 
     users: {
       list: os.users.list.use(authenticated).handler(() => users.list()),
@@ -371,6 +404,18 @@ export function createRouter({
       ask: os.chat.ask
         .use(authenticated)
         .handler(({ input }) => chat.preguntar(input).catch(mapDomainError)),
+    },
+
+    correos: {
+      list: os.correos.list
+        .use(authenticated)
+        .handler(({ input }) => correos.listar(input).catch(mapDomainError)),
+      get: os.correos.get
+        .use(authenticated)
+        .handler(({ input }) => correos.obtenerDetalle(input).catch(mapDomainError)),
+      adjunto: os.correos.adjunto
+        .use(authenticated)
+        .handler(({ input }) => correos.descargarAdjunto(input).catch(mapDomainError)),
     },
   });
 }

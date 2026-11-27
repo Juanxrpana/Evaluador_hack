@@ -7,6 +7,7 @@ import { createAuth, type Auth } from '../src/auth/auth.ts';
 import { createMigrator } from '../src/db/migrator.ts';
 import { createTransactionRunner } from '../src/db/transaction.ts';
 import { PostgresAuditWriter } from '../src/modules/audit/postgres-audit.writer.ts';
+import { CorreoService } from '../src/modules/correos/correo.service.ts';
 import { PostgresUserReader } from '../src/modules/users/postgres-user.reader.ts';
 import { PostgresUserWriter } from '../src/modules/users/postgres-user.writer.ts';
 import type { UserTransaction } from '../src/modules/users/user.transaction.ts';
@@ -63,6 +64,8 @@ beforeAll(async () => {
     decisiones: stub(),
     alertas: { porProveedor: async () => [] },
     permisosDe: async () => new Set(),
+    tasa: stub(),
+    correos: new CorreoService(stub()),
   });
 
   server = createServer(app);

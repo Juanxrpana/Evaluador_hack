@@ -1,5 +1,13 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod';
+import {
+  correoAdjuntoContenidoSchema,
+  correoAdjuntoInput,
+  correoDetalleSchema,
+  correoGetInput,
+  correoListInput,
+  correoSchema,
+} from './schemas/correos.ts';
 import { healthResponseSchema } from './schemas/health.ts';
 import { userSchema } from './schemas/user.ts';
 import {
@@ -34,6 +42,7 @@ import {
   rolSchema,
   usuarioRolInput,
   usuarioSchema,
+  tasaBcvSchema,
 } from './schemas/evaluador.ts';
 
 /**
@@ -503,6 +512,48 @@ export const contract = {
       })
       .input(chatAskInput)
       .output(chatResponseSchema),
+  },
+
+  /** Reference rate for presentation: amounts are stored in USD, VES is derived. */
+  tasa: {
+    bcv: oc
+      .route({
+        method: 'GET',
+        path: '/tasa/bcv',
+        tags: ['evaluador'],
+        summary: 'Get the current BCV USD reference rate',
+      })
+      .output(tasaBcvSchema),
+  },
+
+  correos: {
+    list: oc
+      .route({
+        method: 'GET',
+        path: '/correos/list',
+        tags: ['evaluador'],
+        summary: 'Listar correos del buzón IMAP que tienen archivos adjuntos',
+      })
+      .input(correoListInput)
+      .output(z.array(correoSchema)),
+    get: oc
+      .route({
+        method: 'GET',
+        path: '/correos/{uid}',
+        tags: ['evaluador'],
+        summary: 'Ver la información completa de un correo con adjuntos',
+      })
+      .input(correoGetInput)
+      .output(correoDetalleSchema),
+    adjunto: oc
+      .route({
+        method: 'POST',
+        path: '/correos/adjunto',
+        tags: ['evaluador'],
+        summary: 'Descargar un adjunto de un correo (contenido en base64)',
+      })
+      .input(correoAdjuntoInput)
+      .output(correoAdjuntoContenidoSchema),
   },
 };
 

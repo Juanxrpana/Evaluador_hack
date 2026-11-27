@@ -371,6 +371,16 @@ export const chatAskInput = z.object({
   pregunta: z.string().trim().min(3).max(4000),
 });
 
+/** BCV reference rate. Amounts in the system are USD; VES is a presentation currency. */
+export const tasaBcvSchema = z.object({
+  valor: z.string().regex(/^\d{1,8}(\.\d{1,8})?$/, 'Tasa must be a decimal'),
+  fuente: z.string().trim().min(1).max(100),
+  fecha: z.iso.datetime(),
+  verificada: z.boolean(),
+});
+
+export type TasaBcv = z.infer<typeof tasaBcvSchema>;
+
 export type Proyecto = z.infer<typeof proyectoSchema>;
 export type ProyectoInput = z.infer<typeof proyectoInput>;
 export type ProyectoUpdate = z.infer<typeof proyectoUpdate>;
