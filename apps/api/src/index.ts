@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { sql } from 'kysely';
 import { createApp } from './app.ts';
+import { createAuth } from './auth/auth.ts';
 import { env } from './config/env.ts';
 import { createDatabase } from './db/client.ts';
 import { PostgresUserRepository } from './modules/users/postgres-user.repository.ts';
@@ -15,6 +16,11 @@ await sql`select 1`.execute(db);
 logger.info('Database connection verified');
 
 const app = createApp({
+  auth: createAuth(db, {
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL,
+    trustedOrigins: [env.CORS_ORIGIN],
+  }),
   users: new PostgresUserRepository(db),
 });
 const server = createServer(app);

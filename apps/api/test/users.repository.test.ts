@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { createUserSchema, userSchema } from '@repo/contracts';
+import { userSchema } from '@repo/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMigrator } from '../src/db/migrator.ts';
-import { EmailAlreadyExistsError } from '../src/modules/users/user.errors.ts';
 import { PostgresUserRepository } from '../src/modules/users/postgres-user.repository.ts';
 import { createTestDatabase, type TestDatabase } from './support/test-database.ts';
 
@@ -25,30 +24,36 @@ afterAll(async () => {
 });
 
 describe('PostgresUserRepository', () => {
-  it('round-trips a user through PostgreSQL and the Zod contract', async () => {
-    const input = createUserSchema.parse({
-      name: '  Grace Hopper  ',
-      email: `grace-${randomUUID()}@example.com`,
-    });
+  it('maps a PostgreSQL row to the Zod-owned API shape', async () => {
+    const email = `grace-${randomUUID()}@example.com`;
 
-    const created = await repository.create(input);
-
-    expect(created.name).toBe('Grace Hopper');
-    expect(created.createdAt).toBe(new Date(created.createdAt).toISOString());
-    expect(userSchema.parse(created)).toEqual(created);
+    await testDb.db.insertInto('users').values({ name: 'Grace Hopper', email }).execute();
 
     const users = await repository.list();
-    expect(users).toContainEqual(created);
+    const created = users.find((user) => user.email === email);
+
+    expect(created).toBeDefined();
+    expect(userSchema.parse(created)).toEqual(created);
+    expect(created?.createdAt).toBe(new Date(created?.createdAt ?? '').toISOString());
   });
 
-  it('rejects duplicate emails with a domain error', async () => {
-    const email = `duplicate-${randomUUID()}@example.com`;
-    const input = createUserSchema.parse({ name: 'First User', email });
+  it('returns newest users first', async () => {
+    const older = `older-${randomUUID()}@example.com`;
+    const newer = `newer-${randomUUID()}@example.com`;
 
-    await repository.create(input);
+    await testDb.db
+      .insertInto('users')
+      .values({ name: 'Older', email: older, created_at: new Date('2026-01-01T00:00:00Z') })
+      .execute();
+    await testDb.db
+      .insertInto('users')
+      .values({ name: 'Newer', email: newer, created_at: new Date('2026-02-01T00:00:00Z') })
+      .execute();
 
-    await expect(repository.create({ ...input, name: 'Second User' })).rejects.toBeInstanceOf(
-      EmailAlreadyExistsError,
+    const users = await repository.list();
+
+    expect(users.findIndex((user) => user.email === newer)).toBeLessThan(
+      users.findIndex((user) => user.email === older),
     );
   });
 });

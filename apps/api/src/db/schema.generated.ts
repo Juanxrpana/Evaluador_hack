@@ -23,13 +23,55 @@ export type JsonPrimitive = boolean | number | string | null
 
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive
 
+export interface accounts {
+  access_token: string | null
+  access_token_expires_at: Timestamp | null
+  account_id: string
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  id_token: string | null
+  password: string | null
+  provider_id: string
+  refresh_token: string | null
+  refresh_token_expires_at: Timestamp | null
+  scope: string | null
+  updated_at: Generated<Timestamp>
+  user_id: string
+}
+
+export interface sessions {
+  created_at: Generated<Timestamp>
+  expires_at: Timestamp
+  id: Generated<string>
+  ip_address: string | null
+  token: string
+  updated_at: Generated<Timestamp>
+  user_agent: string | null
+  user_id: string
+}
+
 export interface users {
   created_at: Generated<Timestamp>
   email: string
+  email_verified: Generated<boolean>
   id: Generated<string>
+  image: string | null
   name: string
+  updated_at: Generated<Timestamp>
+}
+
+export interface verifications {
+  created_at: Generated<Timestamp>
+  expires_at: Timestamp
+  id: Generated<string>
+  identifier: string
+  updated_at: Generated<Timestamp>
+  value: string
 }
 
 export interface DB {
+  accounts: accounts
+  sessions: sessions
   users: users
+  verifications: verifications
 }

@@ -1,7 +1,6 @@
-import type { CreateUserInput, User } from '@repo/contracts';
+import type { User } from '@repo/contracts';
 import type { Kysely, Selectable } from 'kysely';
 import type { DB } from '../../db/schema.generated.ts';
-import { EmailAlreadyExistsError } from './user.errors.ts';
 import type { UserRepository } from './user.repository.ts';
 
 /**
@@ -24,27 +23,6 @@ export class PostgresUserRepository implements UserRepository {
 
     return rows.map(toUser);
   }
-
-  async create(input: CreateUserInput): Promise<User> {
-    try {
-      const row = await this.#db
-        .insertInto('users')
-        .values({
-          name: input.name,
-          email: input.email,
-        })
-        .returningAll()
-        .executeTakeFirstOrThrow();
-
-      return toUser(row);
-    } catch (error) {
-      if (isUniqueViolation(error)) {
-        throw new EmailAlreadyExistsError(input.email);
-      }
-
-      throw error;
-    }
-  }
 }
 
 function toUser(row: Selectable<DB['users']>): User {
@@ -58,13 +36,4 @@ function toUser(row: Selectable<DB['users']>): User {
 
 function toIsoString(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === '23505'
-  );
 }

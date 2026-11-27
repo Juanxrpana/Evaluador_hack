@@ -1,8 +1,10 @@
 import { OpenAPIHandler } from '@orpc/openapi/node';
 import { onError, ORPCError } from '@orpc/server';
+import { fromNodeHeaders, toNodeHandler } from 'better-auth/node';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
+import type { Auth } from './auth/auth.ts';
 import { env } from './config/env.ts';
 import type { UserRepository } from './modules/users/user.repository.ts';
 import { auditMutations } from './observability/audit.ts';
@@ -15,12 +17,14 @@ import { requestId } from './observability/request-id.ts';
 import { createRouter } from './router/index.ts';
 
 export interface AppDependencies {
+  auth: Auth;
   users: UserRepository;
 }
 
 export function createApp(dependencies: AppDependencies) {
   const app = express();
   const router = createRouter(dependencies);
+  const authHandler = toNodeHandler(dependencies.auth);
   const openAPIHandler = new OpenAPIHandler(router, {
     interceptors: [
       onError((error) => {
@@ -53,14 +57,30 @@ export function createApp(dependencies: AppDependencies) {
   );
 
   // Audit before rate limiting so rejected write attempts are recorded too.
-  app.use('/api', noStore, auditMutations, apiLimiter, writeLimiter);
+  // Better Auth needs the raw body, so it is mounted before the oRPC handler
+  // and before express.json(). Its own auth-aware rate limiter replaces the
+  // generic write limiter for these routes.
+  app.use('/api', noStore, auditMutations);
+
+  app.all('/api/auth/{*any}', (req, res) => {
+    // Never trust a client-supplied rate-limit key. Express `req.ip` already
+    // honors TRUST_PROXY, so both stacks agree on the caller's address.
+    req.headers['x-client-ip'] = req.ip ?? '';
+    return authHandler(req, res);
+  });
+
+  app.use('/api', apiLimiter, writeLimiter);
 
   // oRPC reads the raw request body. Mount it before express.json() so
   // bracket notation and non-JSON payloads are not consumed by Express.
   app.use('/api{/*path}', async (req, res, next) => {
+    const session = await dependencies.auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+
     const { matched } = await openAPIHandler.handle(req, res, {
       prefix: '/api',
-      context: {},
+      context: { session },
     });
 
     if (matched) {

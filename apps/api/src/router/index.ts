@@ -1,8 +1,12 @@
 import { implement, ORPCError } from '@orpc/server';
 import { contract } from '@repo/contracts';
-import { EmailAlreadyExistsError } from '../modules/users/user.errors.ts';
+import type { Auth } from '../auth/auth.ts';
 import type { UserRepository } from '../modules/users/user.repository.ts';
-import { recordAuditEvent } from '../observability/audit.ts';
+import { setRequestActor } from '../observability/request-context.ts';
+
+export interface ApiContext {
+  session: Awaited<ReturnType<Auth['api']['getSession']>>;
+}
 
 export interface RouterDependencies {
   users: UserRepository;
@@ -13,7 +17,16 @@ export interface RouterDependencies {
  * which keeps them replaceable (Dependency Inversion) and easy to test.
  */
 export function createRouter({ users }: RouterDependencies) {
-  const os = implement(contract);
+  const os = implement(contract).$context<ApiContext>();
+
+  const authenticated = os.middleware(({ context, next }) => {
+    if (!context.session) {
+      throw new ORPCError('UNAUTHORIZED');
+    }
+
+    setRequestActor(context.session.user.id);
+    return next();
+  });
 
   return os.router({
     health: os.health.handler(() => ({
@@ -23,29 +36,7 @@ export function createRouter({ users }: RouterDependencies) {
     })),
 
     users: {
-      list: os.users.list.handler(() => users.list()),
-      create: os.users.create.handler(async ({ input }) => {
-        try {
-          const user = await users.create(input);
-
-          recordAuditEvent({
-            action: 'user.create',
-            outcome: 'success',
-            resource: 'user',
-            resourceId: user.id,
-          });
-
-          return user;
-        } catch (error) {
-          if (error instanceof EmailAlreadyExistsError) {
-            throw new ORPCError('CONFLICT', {
-              message: 'A user with this email already exists',
-            });
-          }
-
-          throw error;
-        }
-      }),
+      list: os.users.list.use(authenticated).handler(() => users.list()),
     },
   });
 }

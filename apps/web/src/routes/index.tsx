@@ -15,8 +15,9 @@ function OverviewPage() {
       <p className="eyebrow">Contract-first starter</p>
       <h1>The stack is running</h1>
       <p className="lede">
-        Express, oRPC, TanStack Router, TanStack Query, React Hook Form, and Zod are wired together.
-        The health value below came through the typed oRPC client.
+        Express, Better Auth, oRPC, TanStack Router, TanStack Query, React Hook Form, and Zod are
+        wired together. The health value below came through the typed oRPC client; the Users page is
+        protected by a Better Auth session.
       </p>
 
       <dl className="status-grid">
@@ -35,8 +36,8 @@ function OverviewPage() {
       </dl>
 
       <p>
-        Open the <Link to="/users">Users</Link> page to see one Zod schema used by the form, the API
-        contract, and the client at the same time.
+        Open the <Link to="/users">Users</Link> page after signing in to see the protected list and
+        the session-aware oRPC context.
       </p>
     </section>
   );

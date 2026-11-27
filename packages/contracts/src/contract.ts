@@ -1,7 +1,7 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod';
 import { healthResponseSchema } from './schemas/health.ts';
-import { createUserSchema, userSchema } from './schemas/user.ts';
+import { userSchema } from './schemas/user.ts';
 
 /**
  * The API contract is the single source of truth for:
@@ -31,17 +31,6 @@ export const contract = {
         summary: 'List users',
       })
       .output(z.array(userSchema)),
-
-    create: oc
-      .route({
-        method: 'POST',
-        path: '/users',
-        successStatus: 201,
-        tags: ['users'],
-        summary: 'Create a user',
-      })
-      .input(createUserSchema)
-      .output(userSchema),
   },
 };
 

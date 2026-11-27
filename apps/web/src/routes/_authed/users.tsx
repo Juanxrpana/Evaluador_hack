@@ -1,9 +1,8 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { UserForm } from '../components/UserForm';
-import { orpc } from '../lib/orpc';
+import { orpc } from '../../lib/orpc';
 
-export const Route = createFileRoute('/users')({
+export const Route = createFileRoute('/_authed/users')({
   loader: ({ context }) => context.queryClient.ensureQueryData(orpc.users.list.queryOptions()),
   component: UsersPage,
 });
@@ -13,14 +12,12 @@ function UsersPage() {
 
   return (
     <section className="stack">
-      <p className="eyebrow">End-to-end example</p>
+      <p className="eyebrow">Authenticated endpoint</p>
       <h1>Users</h1>
       <p className="lede">
-        This list and form share <code>createUserSchema</code> with the server contract. There is no
-        separate DTO or validation copy.
+        This list is served by a protected oRPC procedure. The API resolves the Better Auth session,
+        rejects anonymous callers with 401, and attaches the actor to audit records.
       </p>
-
-      <UserForm />
 
       <ul className="user-list">
         {users.map((user) => (

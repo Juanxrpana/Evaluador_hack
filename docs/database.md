@@ -11,6 +11,7 @@ SQL DDL.
 | API shape and route metadata              | oRPC contract         | `packages/contracts/src/contract.ts`                     |
 | Table structure, indexes, constraints     | PostgreSQL migrations | `apps/api/src/db/migrations/*`                           |
 | Typed SQL query surface                   | Kysely                | `apps/api/src/db/schema.generated.ts`                    |
+| Auth model → column mapping               | Better Auth config    | `apps/api/src/auth/auth.ts`                              |
 | Row → API translation                     | Repository mapper     | `apps/api/src/modules/users/postgres-user.repository.ts` |
 
 This is not duplicated validation:
@@ -87,6 +88,7 @@ Files live in `apps/api/src/db/migrations` and are named with an ISO-like timest
 ```text
 20261127120000_create_users.ts
 20261127121000_add_users_created_at_index.ts
+20261127130000_add_authentication.ts
 ```
 
 Each file exports:
@@ -134,22 +136,42 @@ pnpm db:status     # show applied/pending
 The file is committed so typecheck and builds do not require a database. It is ignored by Oxlint and
 Oxfmt because it is generated. Do not edit it by hand.
 
-The generated file contains the `users` table and the `DB` type:
+The generated file contains the `users` table, the Better Auth tables, and the `DB` type:
 
 ```ts
 export interface users {
   created_at: Generated<Timestamp>;
   email: string;
+  email_verified: Generated<boolean>;
   id: Generated<string>;
+  image: string | null;
   name: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface DB {
+  accounts: accounts;
+  sessions: sessions;
   users: users;
+  verifications: verifications;
 }
 ```
 
 Run `pnpm db:types` after every migration change.
+
+## Better Auth schema
+
+The `users` table is the single identity table. The authentication migration adds `email_verified`,
+`image`, and `updated_at`, then creates `sessions`, `accounts`, and `verifications`. Foreign keys
+use `uuid` because `users.id` is a UUID and `userSchema` validates it with `z.uuid()`.
+
+`apps/api/src/auth/auth.ts` maps Better Auth's camelCase model fields onto the snake_case columns.
+This mapping is part of the application schema contract; renaming a column means updating the map
+and the migration together.
+
+Better Auth's CLI can generate or apply its own migrations, but this project does not use that path
+for deployments. `auth migrate` would bypass Kysely's migration history and the reversible
+migration test. The CLI and `getMigrations(auth.options)` are reference/parity tools only.
 
 ## Repository mapping
 
@@ -171,8 +193,8 @@ function toUser(row: Selectable<DB['users']>): User {
 - If a column is renamed or its nullability changes, the mapper fails to compile.
 - If the API schema changes, the mapper’s return type fails to compile.
 
-The repository also maps PostgreSQL unique violations (`23505`) to `EmailAlreadyExistsError`; the
-oRPC router turns that into HTTP 409.
+The repository is read-only. User creation and password changes belong to Better Auth, which writes
+the `users` row and the credential row in `accounts`.
 
 ## Migration tests
 
@@ -192,7 +214,10 @@ The migration test performs exactly:
 6. Assert `users` exists.
 
 The repository test then inserts a user, validates the result with `userSchema`, lists it, and
-verifies duplicate emails raise the domain error.
+checks ordering. The auth test asserts that `getMigrations(auth.options)` reports no pending Better
+Auth tables or columns, then signs up through the real handler and resolves the session cookie. The
+parity assertion is the canary for Better Auth upgrades: a new required column fails CI until a
+Kysely migration and the field map are updated.
 
 ### Real PostgreSQL 19 parity
 

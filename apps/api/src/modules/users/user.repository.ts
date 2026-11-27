@@ -1,4 +1,4 @@
-import type { CreateUserInput, User } from '@repo/contracts';
+import type { User } from '@repo/contracts';
 
 /**
  * The API depends on this abstraction, not on a concrete database adapter.
@@ -6,5 +6,4 @@ import type { CreateUserInput, User } from '@repo/contracts';
  */
 export interface UserRepository {
   list(): Promise<User[]>;
-  create(input: CreateUserInput): Promise<User>;
 }
