@@ -79,6 +79,17 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  searxng:
+    image: searxng/searxng:latest
+    container_name: evaluador-searxng
+    volumes:
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    ports:
+      - '8888:8080'
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8888/
+    restart: unless-stopped
+
   web:
     build:
       context: .

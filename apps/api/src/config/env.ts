@@ -69,6 +69,12 @@ const envSchema = z.object({
       (value) => Buffer.from(value, 'base64').byteLength === 32,
       'DOCUMENTO_ENCRYPTION_KEY must decode to exactly 32 bytes',
     ),
+  // Market research (SearXNG) and cache TTL.
+  SEARXNG_URL: z.url().default('http://localhost:8888'),
+  SEARXNG_TIMEOUT_MS: z.coerce.number().int().positive().default(12_000),
+  MERCADO_CACHE_HORAS: z.coerce.number().int().positive().default(24),
+  // Batch evaluation: parallel proposals per evaluation run.
+  EVALUACION_CONCURRENCY: z.coerce.number().int().positive().default(4),
 });
 
 export const env = envSchema.parse(process.env);

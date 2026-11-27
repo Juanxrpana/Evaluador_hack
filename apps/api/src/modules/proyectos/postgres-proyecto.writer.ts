@@ -16,6 +16,8 @@ export class PostgresProyectoWriter implements ProyectoWriter {
       .values({
         nombre: input.nombre,
         descripcion: input.descripcion ?? null,
+        ubicacion: input.ubicacion ?? null,
+        presupuesto_referencial: input.presupuestoReferencial ?? null,
       })
       .returning(['id'])
       .executeTakeFirstOrThrow();
@@ -30,6 +32,14 @@ export class PostgresProyectoWriter implements ProyectoWriter {
 
     if (input.descripcion !== undefined) {
       patch.descripcion = input.descripcion;
+    }
+
+    if (input.ubicacion !== undefined) {
+      patch.ubicacion = input.ubicacion;
+    }
+
+    if (input.presupuestoReferencial !== undefined) {
+      patch.presupuesto_referencial = input.presupuestoReferencial;
     }
 
     const rows = await this.#trx

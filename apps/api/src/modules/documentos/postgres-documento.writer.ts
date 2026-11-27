@@ -27,6 +27,7 @@ export class PostgresDocumentoWriter implements DocumentoWriter {
         proveedor_id: input.proveedorId ?? null,
         nombre: input.nombre,
         mime: input.mime,
+        tipo: input.tipo,
         tamano_bytes: String(input.bytes.byteLength),
         contenido: cifrado.bytes,
         metadata: { ...input.metadata, enc: cifrado.algoritmo } as JsonObject,

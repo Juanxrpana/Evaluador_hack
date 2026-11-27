@@ -73,15 +73,53 @@ export interface documento {
   proveedor_id: string | null
   proyecto_id: string
   tamano_bytes: Int8
+  tipo: Generated<string>
 }
 
 export interface estatus {
   comentario: string | null
   created_at: Generated<Timestamp>
   estado: number
+  etapa_id: string | null
   id: Generated<string>
   propuesta_id: string | null
   proyecto_id: string | null
+}
+
+export interface evaluacion {
+  estado: Generated<string>
+  fin: Timestamp | null
+  id: Generated<string>
+  informe: Json | null
+  inicio: Generated<Timestamp>
+  proyecto_id: string
+}
+
+export interface evaluacion_paso {
+  created_at: Generated<Timestamp>
+  descripcion: string
+  detalle: Json | null
+  evaluacion_id: string
+  id: Generated<string>
+  orden: number
+}
+
+export interface evaluacion_propuesta {
+  causas: Generated<Json>
+  costo_real: Numeric | null
+  decision: string
+  evaluacion_id: string
+  id: Generated<string>
+  notas: Generated<Json>
+  propuesta_id: string
+  puntaje: Numeric | null
+}
+
+export interface mercado_cache {
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  resultado: Json
+  termino: string
 }
 
 export interface nota {
@@ -99,15 +137,33 @@ export interface permiso {
   id: Generated<string>
 }
 
+export interface proceso_etapa {
+  id: Generated<string>
+  nombre: string
+  orden: number
+  slug: string
+}
+
 export interface propuesta {
   created_at: Generated<Timestamp>
   documento: string | null
   id: Generated<string>
   metadata: Generated<Json>
+  moneda: string | null
   monto: Numeric | null
   proveedor_id: string
   proyecto_id: string
   updated_at: Generated<Timestamp>
+}
+
+export interface propuesta_item {
+  cantidad: Numeric
+  id: Generated<string>
+  linea: number
+  moneda: string | null
+  nombre: string
+  precio_unitario: Numeric
+  propuesta_id: string
 }
 
 export interface proveedor {
@@ -116,6 +172,8 @@ export interface proveedor {
   id: Generated<string>
   metadata: Generated<Json>
   nombre: string
+  rif: string | null
+  ubicacion: string | null
   updated_at: Generated<Timestamp>
 }
 
@@ -125,6 +183,8 @@ export interface proyecto {
   id: Generated<string>
   metadata: Generated<Json>
   nombre: string
+  presupuesto_referencial: Numeric | null
+  ubicacion: string | null
   updated_at: Generated<Timestamp>
 }
 
@@ -133,7 +193,9 @@ export interface recargos {
   created_at: Generated<Timestamp>
   id: Generated<string>
   metadata: Generated<Json>
-  monto: Numeric
+  moneda: string | null
+  monto: Numeric | null
+  porcentaje: Numeric | null
   propuesta_id: string
 }
 
@@ -158,6 +220,14 @@ export interface sessions {
   updated_at: Generated<Timestamp>
   user_agent: string | null
   user_id: string
+}
+
+export interface tasa_bcv {
+  created_at: Generated<Timestamp>
+  fecha: Timestamp
+  fuente: string
+  id: Generated<string>
+  tasa: Numeric
 }
 
 export interface users {
@@ -186,15 +256,22 @@ export interface DB {
   conocimiento: conocimiento
   documento: documento
   estatus: estatus
+  evaluacion: evaluacion
+  evaluacion_paso: evaluacion_paso
+  evaluacion_propuesta: evaluacion_propuesta
+  mercado_cache: mercado_cache
   nota: nota
   permiso: permiso
+  proceso_etapa: proceso_etapa
   propuesta: propuesta
+  propuesta_item: propuesta_item
   proveedor: proveedor
   proyecto: proyecto
   recargos: recargos
   rol: rol
   rol_permiso: rol_permiso
   sessions: sessions
+  tasa_bcv: tasa_bcv
   users: users
   verifications: verifications
 }

@@ -8,6 +8,8 @@ export function toProyecto(row: Selectable<DB['proyecto']>): Proyecto {
     id: row.id,
     nombre: row.nombre,
     descripcion: row.descripcion,
+    ubicacion: row.ubicacion,
+    presupuestoReferencial: row.presupuesto_referencial,
     createdAt: toIsoString(row.created_at),
   };
 }

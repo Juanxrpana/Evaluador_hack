@@ -8,6 +8,8 @@ export function toRecargo(row: Selectable<DB['recargos']>): Recargo {
     propuestaId: row.propuesta_id,
     concepto: row.concepto,
     monto: row.monto,
+    porcentaje: row.porcentaje,
+    moneda: row.moneda,
     createdAt: toIsoString(row.created_at),
   };
 }

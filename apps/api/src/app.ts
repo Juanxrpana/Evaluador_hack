@@ -9,13 +9,19 @@ import { env } from './config/env.ts';
 import type { ChatService } from './modules/chat/chat.service.ts';
 import type { ConocimientoListService } from './modules/documentos/conocimiento.list.ts';
 import type { DocumentoService } from './modules/documentos/documento.service.ts';
+import type { EvaluacionService } from './modules/evaluaciones/evaluacion.service.ts';
 import type { EstatusService } from './modules/estatus/estatus.service.ts';
+import type { EtapasService } from './modules/etapas/etapas.service.ts';
 import type { NotaService } from './modules/notas/nota.service.ts';
+import type { PropuestaItemReader } from './modules/propuestas/propuesta-item.reader.ts';
+import type { DecisionFinalService } from './modules/propuestas/decision-final.service.ts';
 import type { PropuestaService } from './modules/propuestas/propuesta.service.ts';
 import type { ProyectoService } from './modules/proyectos/proyecto.service.ts';
 import type { ProveedorService } from './modules/proveedores/proveedor.service.ts';
 import type { RecargoReader } from './modules/recargos/recargo.reader.ts';
+import type { UsuarioService } from './modules/usuarios/usuario.service.ts';
 import type { UserService } from './modules/users/user.service.ts';
+import type { AlertaAntecedente } from '@repo/contracts';
 import { auditMutations } from './observability/audit.ts';
 import { errorHandler, notFound } from './observability/error-handler.ts';
 import { exposedHeaders, noStore } from './observability/http-headers.ts';
@@ -37,6 +43,13 @@ export interface AppDependencies {
   estatus: EstatusService;
   recargos: RecargoReader;
   conocimiento: ConocimientoListService;
+  items: PropuestaItemReader;
+  evaluaciones: EvaluacionService;
+  procesos: EtapasService;
+  usuarios: UsuarioService;
+  decisiones: DecisionFinalService;
+  alertas: { porProveedor(proveedorId: string): Promise<AlertaAntecedente[]> };
+  permisosDe: (usuarioId: string) => Promise<Set<string>>;
 }
 
 export function createApp(dependencies: AppDependencies) {

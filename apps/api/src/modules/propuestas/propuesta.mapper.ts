@@ -8,6 +8,7 @@ export function toPropuesta(row: Selectable<DB['propuesta']>): Propuesta {
     proyectoId: row.proyecto_id,
     proveedorId: row.proveedor_id,
     monto: row.monto,
+    moneda: row.moneda,
     createdAt: toIsoString(row.created_at),
   };
 }

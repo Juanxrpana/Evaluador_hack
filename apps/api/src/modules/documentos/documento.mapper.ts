@@ -10,6 +10,7 @@ export function toDocumento(row: Selectable<DB['documento']>): Documento {
     proveedorId: row.proveedor_id,
     nombre: row.nombre,
     mime: row.mime,
+    tipo: row.tipo as Documento['tipo'],
     tamanoBytes: Number(row.tamano_bytes),
     createdAt: toIsoString(row.created_at),
   };

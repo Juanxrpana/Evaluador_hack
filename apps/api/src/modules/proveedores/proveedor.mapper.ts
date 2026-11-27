@@ -7,6 +7,8 @@ export function toProveedor(row: Selectable<DB['proveedor']>): Proveedor {
     id: row.id,
     nombre: row.nombre,
     contacto: row.contacto,
+    rif: row.rif,
+    ubicacion: row.ubicacion,
     createdAt: toIsoString(row.created_at),
   };
 }

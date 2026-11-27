@@ -56,6 +56,13 @@ beforeAll(async () => {
     estatus: stub(),
     recargos: stub(),
     conocimiento: stub(),
+    items: stub(),
+    evaluaciones: stub(),
+    procesos: stub(),
+    usuarios: stub(),
+    decisiones: stub(),
+    alertas: { porProveedor: async () => [] },
+    permisosDe: async () => new Set(),
   });
 
   server = createServer(app);

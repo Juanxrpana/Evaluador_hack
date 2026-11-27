@@ -7,11 +7,20 @@ export interface LlmImage {
   base64: string;
 }
 
+/** Native document (e.g. PDF) sent to a multimodal model that accepts files. */
+export interface LlmDocumento {
+  nombre: string;
+  mime: string;
+  base64: string;
+}
+
 export interface LlmCompletionRequest {
   system: string;
   question: string;
   /** Optional images (PNG/JPEG) sent to a vision-capable model. */
   images?: LlmImage[];
+  /** Optional native documents (PDF) for models with file input support. */
+  documents?: LlmDocumento[];
   maxTokens?: number;
   temperature?: number;
 }

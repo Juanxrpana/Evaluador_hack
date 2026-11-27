@@ -25,6 +25,7 @@
     "@repo/contracts": "workspace:*",
     "better-auth": "catalog:",
     "cors": "catalog:",
+    "exceljs": "^4.4.0",
     "express": "catalog:",
     "express-rate-limit": "catalog:",
     "helmet": "catalog:",

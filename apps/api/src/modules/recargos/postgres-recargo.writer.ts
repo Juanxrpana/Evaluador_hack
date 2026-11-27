@@ -23,6 +23,8 @@ export class PostgresRecargoWriter implements RecargoWriter {
           propuesta_id: propuestaId,
           concepto: recargo.concepto,
           monto: recargo.monto,
+          porcentaje: recargo.porcentaje,
+          moneda: recargo.moneda,
         })),
       )
       .execute();

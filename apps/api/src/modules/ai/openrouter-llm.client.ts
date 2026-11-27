@@ -3,9 +3,10 @@ import { LlmError } from './llm.client.ts';
 import type { LlmClient, LlmCompletion, LlmCompletionRequest, LlmErrorCode } from './llm.client.ts';
 
 interface OpenRouterContentPart {
-  type: 'text' | 'image_url';
+  type: 'text' | 'image_url' | 'file';
   text?: string;
   image_url?: { url: string };
+  file?: { filename: string; file_data: string };
 }
 
 interface OpenRouterResponse {
@@ -41,7 +42,10 @@ export class OpenRouterLlmClient implements LlmClient {
   }
 
   async complete(request: LlmCompletionRequest): Promise<LlmCompletion> {
-    const model = request.images && request.images.length > 0 ? this.#visionModel : this.#model;
+    const multimodal =
+      (request.images !== undefined && request.images.length > 0) ||
+      (request.documents !== undefined && request.documents.length > 0);
+    const model = multimodal ? this.#visionModel : this.#model;
     const response = await this.#post({
       model,
       messages: [
@@ -63,12 +67,26 @@ export class OpenRouterLlmClient implements LlmClient {
   }
 
   #userContent(request: LlmCompletionRequest): string | OpenRouterContentPart[] {
-    if (!request.images || request.images.length === 0) {
+    if (
+      (!request.images || request.images.length === 0) &&
+      (!request.documents || request.documents.length === 0)
+    ) {
       return request.question;
     }
 
     const parts: OpenRouterContentPart[] = [{ type: 'text', text: request.question }];
-    for (const image of request.images) {
+
+    for (const documento of request.documents ?? []) {
+      parts.push({
+        type: 'file',
+        file: {
+          filename: documento.nombre,
+          file_data: `data:${documento.mime};base64,${documento.base64}`,
+        },
+      });
+    }
+
+    for (const image of request.images ?? []) {
       parts.push({
         type: 'image_url',
         image_url: { url: `data:${image.mime};base64,${image.base64}` },

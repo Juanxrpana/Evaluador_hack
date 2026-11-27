@@ -8,9 +8,13 @@ export interface ProyectoReader {
 export interface CreateProyectoInput {
   nombre: string;
   descripcion?: string;
+  ubicacion?: string;
+  presupuestoReferencial?: string;
 }
 
 export interface UpdateProyectoInput {
   nombre?: string;
   descripcion?: string | null | undefined;
+  ubicacion?: string | null | undefined;
+  presupuestoReferencial?: string | null | undefined;
 }

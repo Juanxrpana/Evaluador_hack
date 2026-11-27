@@ -99,6 +99,7 @@ describe('PostgresDocumentoWriter at rest', () => {
         proveedorId: null,
         nombre: 'Propuesta_101_Alfa_CA.pdf',
         mime: 'application/pdf',
+        tipo: 'propuesta',
         bytes: claro,
       });
 

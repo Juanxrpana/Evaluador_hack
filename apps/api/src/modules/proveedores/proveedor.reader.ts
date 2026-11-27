@@ -9,9 +9,13 @@ export interface ProveedorReader {
 export interface CreateProveedorInput {
   nombre: string;
   contacto?: string;
+  rif?: string;
+  ubicacion?: string;
 }
 
 export interface UpdateProveedorInput {
   nombre?: string;
   contacto?: string | null | undefined;
+  rif?: string | null | undefined;
+  ubicacion?: string | null | undefined;
 }

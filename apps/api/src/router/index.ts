@@ -22,6 +22,14 @@ import { PropuestaNoEncontradaError } from '../modules/propuestas/propuesta.serv
 import type { PropuestaService } from '../modules/propuestas/propuesta.service.ts';
 import type { UserService } from '../modules/users/user.service.ts';
 import { getRequestLogger, setRequestActor } from '../observability/request-context.ts';
+import type { AlertaAntecedente } from '@repo/contracts';
+import type { EvaluacionService } from '../modules/evaluaciones/evaluacion.service.ts';
+import { ProyectoSinPropuestasError } from '../modules/evaluaciones/evaluacion.service.ts';
+import type { EtapasService } from '../modules/etapas/etapas.service.ts';
+import { DecisionFinalService } from '../modules/propuestas/decision-final.service.ts';
+import type { PropuestaItemReader } from '../modules/propuestas/propuesta-item.reader.ts';
+import type { UsuarioService } from '../modules/usuarios/usuario.service.ts';
+import { RolNoExisteError, UsuarioNoEncontradoError } from '../modules/usuarios/usuario.service.ts';
 import type { EstatusService } from '../modules/estatus/estatus.service.ts';
 import { EstatusNoEncontradoError } from '../modules/estatus/estatus.service.ts';
 import type { NotaService } from '../modules/notas/nota.service.ts';
@@ -45,6 +53,14 @@ export interface RouterDependencies {
   estatus: EstatusService;
   recargos: RecargoReader;
   conocimiento: ConocimientoListService;
+  items: PropuestaItemReader;
+  evaluaciones: EvaluacionService;
+  procesos: EtapasService;
+  usuarios: UsuarioService;
+  decisiones: DecisionFinalService;
+  alertas: { porProveedor(proveedorId: string): Promise<AlertaAntecedente[]> };
+  /** User permission codes (E.2.b), resolved per request. */
+  permisosDe: (usuarioId: string) => Promise<Set<string>>;
 }
 
 /** Expected domain failures become typed 4xx responses; nothing else escapes. */
@@ -59,7 +75,9 @@ function mapDomainError(error: unknown): never {
     error instanceof ProyectoNoEncontradoChatError ||
     error instanceof DocumentoNoEncontradoError ||
     error instanceof NotaNoEncontradaError ||
-    error instanceof EstatusNoEncontradoError
+    error instanceof EstatusNoEncontradoError ||
+    error instanceof UsuarioNoEncontradoError ||
+    error instanceof RolNoExisteError
   ) {
     throw new ORPCError('NOT_FOUND', { message: error.message });
   }
@@ -98,6 +116,23 @@ function mapDomainError(error: unknown): never {
     });
   }
 
+  if (error instanceof ProyectoSinPropuestasError) {
+    throw new ORPCError('BAD_REQUEST', {
+      message: 'El proyecto no tiene propuestas para evaluar.',
+    });
+  }
+
+  if (error instanceof Error && error.name === 'PermisoFaltanteError') {
+    throw new ORPCError('FORBIDDEN', { message: error.message });
+  }
+
+  if (
+    error instanceof Error &&
+    (error.name === 'EvaluacionNoEncontradaError' || error.name === 'EvaluacionSinInformeError')
+  ) {
+    throw new ORPCError('NOT_FOUND', { message: error.message });
+  }
+
   // Unknown failures keep the safe message but never lose their cause.
   getRequestLogger().error({ err: error }, 'unmapped domain error');
   throw new ORPCError('INTERNAL', { message: 'Unexpected server error' });
@@ -118,6 +153,13 @@ export function createRouter({
   estatus,
   recargos,
   conocimiento,
+  items,
+  evaluaciones,
+  procesos,
+  usuarios,
+  decisiones,
+  alertas,
+  permisosDe,
 }: RouterDependencies) {
   const os = implement(contract).$context<ApiContext>();
 
@@ -129,6 +171,23 @@ export function createRouter({
     setRequestActor(context.session.user.id);
     return next();
   });
+
+  /** E.2.b: real permission checks per procedure. */
+  const requirePermiso = (codigo: string) =>
+    os.middleware(async ({ context, next }) => {
+      if (!context.session) {
+        throw new ORPCError('UNAUTHORIZED');
+      }
+
+      setRequestActor(context.session.user.id);
+      const permisos = await permisosDe(context.session.user.id);
+
+      if (!permisos.has(codigo)) {
+        throw new ORPCError('FORBIDDEN', { message: `Requiere el permiso ${codigo}` });
+      }
+
+      return next();
+    });
 
   return os.router({
     health: os.health.handler(() => ({
@@ -248,6 +307,64 @@ export function createRouter({
         .handler(({ input }) =>
           conocimiento.listByProyecto(input.proyectoId).catch(mapDomainError),
         ),
+    },
+
+    items: {
+      list: os.items.list
+        .use(authenticated)
+        .handler(({ input }) => items.listByPropuesta(input.propuestaId).catch(mapDomainError)),
+    },
+
+    evaluaciones: {
+      lanzar: os.evaluaciones.lanzar
+        .use(requirePermiso('evaluacion.lanzar'))
+        .handler(({ input }) => evaluaciones.lanzar(input.proyectoId).catch(mapDomainError)),
+      get: os.evaluaciones.get
+        .use(authenticated)
+        .handler(({ input }) => evaluaciones.obtener(input.id).catch(mapDomainError)),
+      list: os.evaluaciones.list
+        .use(authenticated)
+        .handler(({ input }) =>
+          evaluaciones.listByProyecto(input.proyectoId).catch(mapDomainError),
+        ),
+      informeMarkdown: os.evaluaciones.informeMarkdown
+        .use(authenticated)
+        .handler(({ input }) => evaluaciones.informeMarkdown(input.id).catch(mapDomainError)),
+      informeCsv: os.evaluaciones.informeCsv
+        .use(authenticated)
+        .handler(({ input }) => evaluaciones.informeCsv(input.id).catch(mapDomainError)),
+    },
+
+    procesos: {
+      etapas: os.procesos.etapas
+        .use(authenticated)
+        .handler(() => procesos.list().catch(mapDomainError)),
+    },
+
+    usuarios: {
+      list: os.usuarios.list
+        .use(requirePermiso('usuario.ver'))
+        .handler(() => usuarios.list().catch(mapDomainError)),
+      roles: os.usuarios.roles
+        .use(requirePermiso('usuario.ver'))
+        .handler(() => usuarios.roles().catch(mapDomainError)),
+      asignarRol: os.usuarios.asignarRol
+        .use(requirePermiso('usuario.asignar_rol'))
+        .handler(({ input }) => usuarios.asignarRol(input.id, input.rolId).catch(mapDomainError)),
+    },
+
+    decisiones: {
+      final: os.decisiones.final
+        .use(authenticated)
+        .handler(({ input, context }) =>
+          decisiones.registrar(input, context.session!.user.id, permisosDe).catch(mapDomainError),
+        ),
+    },
+
+    alertas: {
+      proveedor: os.alertas.proveedor
+        .use(authenticated)
+        .handler(({ input }) => alertas.porProveedor(input.proveedorId).catch(mapDomainError)),
     },
 
     chat: {

@@ -17,6 +17,7 @@ export class PostgresPropuestaWriter implements PropuestaWriter {
         proyecto_id: input.proyectoId,
         proveedor_id: input.proveedorId,
         monto: input.monto ?? null,
+        moneda: input.moneda ?? null,
       })
       .returning(['id'])
       .executeTakeFirstOrThrow();
@@ -27,6 +28,10 @@ export class PostgresPropuestaWriter implements PropuestaWriter {
 
     if (input.monto !== undefined) {
       patch.monto = input.monto;
+    }
+
+    if (input.moneda !== undefined) {
+      patch.moneda = input.moneda;
     }
 
     const rows = await this.#trx

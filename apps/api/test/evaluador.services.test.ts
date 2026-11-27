@@ -16,12 +16,28 @@ import { buildProveedorHistorialText } from '../src/modules/documentos/proveedor
 class FakeMontosExtractor {
   readonly #resultado: {
     montoTotal: string | null;
-    recargos: Array<{ concepto: string; monto: string }>;
+    moneda: string | null;
+    recargos: Array<{ concepto: string; monto: string | null; porcentaje: string | null }>;
+    items: Array<{
+      nombre: string;
+      cantidad: string;
+      precioUnitario: string;
+      moneda: string | null;
+    }>;
+    instruccionesOcultas: string[];
   };
 
   constructor(resultado: {
     montoTotal: string | null;
-    recargos: Array<{ concepto: string; monto: string }>;
+    moneda: string | null;
+    recargos: Array<{ concepto: string; monto: string | null; porcentaje: string | null }>;
+    items: Array<{
+      nombre: string;
+      cantidad: string;
+      precioUnitario: string;
+      moneda: string | null;
+    }>;
+    instruccionesOcultas: string[];
   }) {
     this.#resultado = resultado;
   }
@@ -77,6 +93,8 @@ function historialFake(): ProveedorHistorial {
       id,
       nombre: 'Constructora Andina',
       contacto: null,
+      rif: null,
+      ubicacion: null,
       createdAt: new Date().toISOString(),
     },
     entradas: [
@@ -92,6 +110,8 @@ function historialFake(): ProveedorHistorial {
             propuestaId: randomUUID(),
             concepto: 'Flete',
             monto: '5000.00',
+            porcentaje: null,
+            moneda: null,
             createdAt: new Date().toISOString(),
           },
         ],
@@ -114,6 +134,8 @@ function proyectoFake() {
     id: randomUUID(),
     nombre: 'Proyecto X',
     descripcion: null,
+    ubicacion: null,
+    presupuestoReferencial: null,
     createdAt: new Date().toISOString(),
   };
 }
@@ -154,7 +176,21 @@ describe('DocumentoService.subir', () => {
     const montosActualizados: Array<{ id: string; monto: string | null }> = [];
     const recargosReemplazados: Array<{
       propuestaId: string;
-      recargos: Array<{ concepto: string; monto: string }>;
+      recargos: Array<{
+        concepto: string;
+        monto: string | null;
+        porcentaje: string | null;
+        moneda: string | null;
+      }>;
+    }> = [];
+    const itemsReemplazados: Array<{
+      propuestaId: string;
+      items: Array<{
+        nombre: string;
+        cantidad: string;
+        precioUnitario: string;
+        moneda: string | null;
+      }>;
     }> = [];
     let documentoCreado: Documento | null = null;
 
@@ -176,6 +212,7 @@ describe('DocumentoService.subir', () => {
                 proveedorId: input.proveedorId ?? null,
                 nombre: input.nombre,
                 mime: input.mime,
+                tipo: input.tipo,
                 tamanoBytes: input.bytes.byteLength,
                 createdAt: new Date().toISOString(),
               };
@@ -205,6 +242,12 @@ describe('DocumentoService.subir', () => {
               return true;
             },
           },
+          propuestaItems: {
+            async replaceForPropuesta(propuestaId, items) {
+              itemsReemplazados.push({ propuestaId, items });
+              return items.length;
+            },
+          },
           recargos: {
             async replaceForPropuesta(propuestaId, recargos) {
               recargosReemplazados.push({ propuestaId, recargos });
@@ -226,6 +269,8 @@ describe('DocumentoService.subir', () => {
             id: randomUUID(),
             nombre: 'Proyecto X',
             descripcion: null,
+            ubicacion: null,
+            presupuestoReferencial: null,
             createdAt: new Date().toISOString(),
           };
         },
@@ -247,6 +292,8 @@ describe('DocumentoService.subir', () => {
             id,
             nombre: 'Constructora Andina',
             contacto: null,
+            rif: null,
+            ubicacion: null,
             createdAt: new Date().toISOString(),
           };
         },
@@ -260,7 +307,13 @@ describe('DocumentoService.subir', () => {
         },
       },
       embeddings,
-      new FakeMontosExtractor({ montoTotal: null, recargos: [] }),
+      new FakeMontosExtractor({
+        montoTotal: null,
+        moneda: null,
+        recargos: [],
+        items: [],
+        instruccionesOcultas: [],
+      }),
     );
 
     const resultado = await servicio.subir({
@@ -290,7 +343,21 @@ describe('DocumentoService.subir', () => {
     const montosActualizados: Array<{ id: string; monto: string | null }> = [];
     const recargosReemplazados: Array<{
       propuestaId: string;
-      recargos: Array<{ concepto: string; monto: string }>;
+      recargos: Array<{
+        concepto: string;
+        monto: string | null;
+        porcentaje: string | null;
+        moneda: string | null;
+      }>;
+    }> = [];
+    const itemsReemplazados: Array<{
+      propuestaId: string;
+      items: Array<{
+        nombre: string;
+        cantidad: string;
+        precioUnitario: string;
+        moneda: string | null;
+      }>;
     }> = [];
     const proyectoId = randomUUID();
     const propuestaId = randomUUID();
@@ -313,6 +380,7 @@ describe('DocumentoService.subir', () => {
                 proveedorId: input.proveedorId ?? null,
                 nombre: input.nombre,
                 mime: input.mime,
+                tipo: input.tipo,
                 tamanoBytes: input.bytes.byteLength,
                 createdAt: new Date().toISOString(),
               };
@@ -339,6 +407,12 @@ describe('DocumentoService.subir', () => {
             },
             async remove() {
               return true;
+            },
+          },
+          propuestaItems: {
+            async replaceForPropuesta(propuestaIdItems, items) {
+              itemsReemplazados.push({ propuestaId: propuestaIdItems, items });
+              return items.length;
             },
           },
           recargos: {
@@ -368,6 +442,7 @@ describe('DocumentoService.subir', () => {
             proyectoId,
             proveedorId: randomUUID(),
             monto: null,
+            moneda: null,
             createdAt: new Date().toISOString(),
           };
         },
@@ -394,10 +469,20 @@ describe('DocumentoService.subir', () => {
       embeddings,
       new FakeMontosExtractor({
         montoTotal: '118500.00',
+        moneda: 'USD',
         recargos: [
-          { concepto: 'Flete', monto: '4200.00' },
-          { concepto: 'Instalación', monto: '1500.00' },
+          { concepto: 'Flete', monto: '4200.00', porcentaje: null },
+          { concepto: 'Envío especializado', monto: null, porcentaje: '50.00' },
         ],
+        items: [
+          {
+            nombre: 'Equipos de cómputo',
+            cantidad: '10.00',
+            precioUnitario: '11850.00',
+            moneda: 'USD',
+          },
+        ],
+        instruccionesOcultas: [],
       }),
     );
 
@@ -414,12 +499,31 @@ describe('DocumentoService.subir', () => {
       {
         propuestaId,
         recargos: [
-          { concepto: 'Flete', monto: '4200.00' },
-          { concepto: 'Instalación', monto: '1500.00' },
+          { concepto: 'Flete', monto: '4200.00', porcentaje: null, moneda: 'USD' },
+          { concepto: 'Envío especializado', monto: null, porcentaje: '50.00', moneda: 'USD' },
         ],
       },
     ]);
-    expect(resultado.extraccion).toEqual({ montoTotal: '118500.00', recargos: 2 });
+    expect(itemsReemplazados).toEqual([
+      {
+        propuestaId,
+        items: [
+          {
+            nombre: 'Equipos de cómputo',
+            cantidad: '10.00',
+            precioUnitario: '11850.00',
+            moneda: 'USD',
+          },
+        ],
+      },
+    ]);
+    expect(resultado.extraccion).toEqual({
+      montoTotal: '118500.00',
+      moneda: 'USD',
+      recargos: 2,
+      items: 1,
+      instruccionesOcultas: 0,
+    });
     expect(auditorias).toEqual(['documento.upload']);
   });
 
@@ -466,7 +570,13 @@ describe('DocumentoService.subir', () => {
         },
       },
       new FakeEmbeddings(),
-      new FakeMontosExtractor({ montoTotal: null, recargos: [] }),
+      new FakeMontosExtractor({
+        montoTotal: null,
+        moneda: null,
+        recargos: [],
+        items: [],
+        instruccionesOcultas: [],
+      }),
     );
 
     await expect(
@@ -522,7 +632,13 @@ describe('DocumentoService.subir', () => {
         },
       },
       new FakeEmbeddings(),
-      new FakeMontosExtractor({ montoTotal: null, recargos: [] }),
+      new FakeMontosExtractor({
+        montoTotal: null,
+        moneda: null,
+        recargos: [],
+        items: [],
+        instruccionesOcultas: [],
+      }),
     );
 
     const gigante = Buffer.alloc(2000).toString('base64');
@@ -554,6 +670,8 @@ describe('ChatService.preguntar', () => {
             id,
             nombre: 'Proyecto X',
             descripcion: null,
+            ubicacion: null,
+            presupuestoReferencial: null,
             createdAt: new Date().toISOString(),
           };
         },

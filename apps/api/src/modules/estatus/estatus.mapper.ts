@@ -9,6 +9,7 @@ export function toEstatus(row: Selectable<DB['estatus']>): Estatus {
     propuestaId: row.propuesta_id,
     estado: row.estado,
     comentario: row.comentario,
+    etapaId: row.etapa_id,
     createdAt: toIsoString(row.created_at),
   };
 }

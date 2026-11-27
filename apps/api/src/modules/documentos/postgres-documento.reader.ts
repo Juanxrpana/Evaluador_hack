@@ -23,6 +23,7 @@ export class PostgresDocumentoReader {
         'proveedor_id',
         'nombre',
         'mime',
+        'tipo',
         'tamano_bytes',
         'created_at',
       ])
@@ -37,6 +38,7 @@ export class PostgresDocumentoReader {
       proveedorId: row.proveedor_id,
       nombre: row.nombre,
       mime: row.mime,
+      tipo: row.tipo as Documento['tipo'],
       tamanoBytes: Number(row.tamano_bytes),
       createdAt: toIsoString(row.created_at),
     }));

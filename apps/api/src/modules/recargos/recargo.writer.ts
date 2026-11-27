@@ -1,6 +1,10 @@
 export interface RecargoEscritura {
   concepto: string;
-  monto: string;
+  /** Fixed amount, or null when the surcharge is a percentage. */
+  monto: string | null;
+  /** Percentage over the offered base amount, or null for fixed amounts. */
+  porcentaje: string | null;
+  moneda: string | null;
 }
 
 /**

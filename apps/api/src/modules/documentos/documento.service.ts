@@ -69,8 +69,10 @@ export class DocumentoService {
     proveedorId?: string | undefined;
     nombre: string;
     mime: string;
+    tipo?: 'propuesta' | 'requerimientos' | undefined;
     contenidoBase64: string;
   }): Promise<DocumentoUploadResponse> {
+    const tipo = input.tipo ?? 'propuesta';
     const proyecto = await this.#proyectos.get(input.proyectoId);
     if (!proyecto) {
       throw new ProyectoNoExisteError(input.proyectoId);
@@ -134,22 +136,24 @@ export class DocumentoService {
     }
 
     // 4) When the document belongs to a propuesta, the LLM extracts the
-    // offered monto and the surcharges (recargos) BEFORE the transaction.
+    // offered monto, currency, surcharges (fixed and %) and line items
+    // BEFORE the transaction (no external I/O inside it).
     let extraccion: MontosExtraidos | null = null;
 
     if (input.propuestaId) {
       extraccion = await this.#extractorMontos.extraer(texto);
     }
 
-    // 5) One transaction: documento + knowledge chunks + propuesta/recargos + audit.
+    // 5) One transaction: documento + knowledge chunks + propuesta/recargos/ítems + audit.
     const resultado = await this.#runInTransaction(
-      async ({ documentos, conocimiento, propuestas, recargos, audit }) => {
+      async ({ documentos, conocimiento, propuestas, propuestaItems, recargos, audit }) => {
         const { id: documentoId } = await documentos.create({
           proyectoId: input.proyectoId,
           propuestaId: input.propuestaId ?? null,
           proveedorId: input.proveedorId ?? null,
           nombre: input.nombre,
           mime: input.mime,
+          tipo,
           bytes,
         });
 
@@ -177,14 +181,22 @@ export class DocumentoService {
         }
 
         let recargosInsertados = 0;
+        let itemsInsertados = 0;
         if (input.propuestaId && extraccion) {
-          if (extraccion.montoTotal !== null) {
-            await propuestas.update(input.propuestaId, { monto: extraccion.montoTotal });
+          if (extraccion.montoTotal !== null || extraccion.moneda !== null) {
+            await propuestas.update(input.propuestaId, {
+              monto: extraccion.montoTotal ?? undefined,
+              moneda: extraccion.moneda ?? undefined,
+            });
           }
 
           recargosInsertados = await recargos.replaceForPropuesta(
             input.propuestaId,
-            extraccion.recargos,
+            extraccion.recargos.map((recargo) => ({ ...recargo, moneda: extraccion.moneda })),
+          );
+          itemsInsertados = await propuestaItems.replaceForPropuesta(
+            input.propuestaId,
+            extraccion.items,
           );
         }
 
@@ -194,7 +206,13 @@ export class DocumentoService {
           resourceId: documentoId,
         });
 
-        return { documentoId, chunksInsertados, historialInsertados, recargosInsertados };
+        return {
+          documentoId,
+          chunksInsertados,
+          historialInsertados,
+          recargosInsertados,
+          itemsInsertados,
+        };
       },
     );
 
@@ -212,7 +230,10 @@ export class DocumentoService {
       extraccion: input.propuestaId
         ? {
             montoTotal: extraccion?.montoTotal ?? null,
+            moneda: extraccion?.moneda ?? null,
             recargos: resultado.recargosInsertados,
+            items: resultado.itemsInsertados,
+            instruccionesOcultas: extraccion?.instruccionesOcultas.length ?? 0,
           }
         : null,
     };

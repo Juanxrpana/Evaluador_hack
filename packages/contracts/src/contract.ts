@@ -3,18 +3,22 @@ import { z } from 'zod';
 import { healthResponseSchema } from './schemas/health.ts';
 import { userSchema } from './schemas/user.ts';
 import {
+  alertaSchema,
   chatAskInput,
   chatResponseSchema,
   conocimientoSchema,
   documentoSchema,
   documentoUploadInput,
   documentoUploadResponse,
+  evaluacionDetalleSchema,
+  evaluacionSchema,
   estatusInput,
   estatusSchema,
   estatusUpdate,
   notaInput,
   notaSchema,
   notaUpdate,
+  procesoEtapaSchema,
   proyectoInput,
   proyectoSchema,
   proyectoUpdate,
@@ -22,10 +26,14 @@ import {
   proveedorInput,
   proveedorSchema,
   proveedorUpdate,
+  propuestaItemSchema,
   propuestaInput,
   propuestaSchema,
   propuestaUpdate,
   recargoSchema,
+  rolSchema,
+  usuarioRolInput,
+  usuarioSchema,
 } from './schemas/evaluador.ts';
 
 /**
@@ -220,6 +228,140 @@ export const contract = {
       })
       .input(z.object({ propuestaId: z.uuid() }))
       .output(z.array(recargoSchema)),
+  },
+
+  /** Items the LLM extracted per propuesta (B.5). */
+  items: {
+    list: oc
+      .route({
+        method: 'GET',
+        path: '/items',
+        tags: ['evaluador'],
+        summary: 'List the line items the LLM extracted for one propuesta',
+      })
+      .input(z.object({ propuestaId: z.uuid() }))
+      .output(z.array(propuestaItemSchema)),
+  },
+
+  /** Agent evaluation runs (3.c / D.3 / D.4). */
+  evaluaciones: {
+    lanzar: oc
+      .route({
+        method: 'POST',
+        path: '/evaluaciones',
+        tags: ['evaluador'],
+        summary: 'Run the evaluation engine for one proyecto (requires evaluacion.lanzar)',
+      })
+      .input(z.object({ proyectoId: z.uuid() }))
+      .output(evaluacionDetalleSchema),
+    get: oc
+      .route({
+        method: 'GET',
+        path: '/evaluaciones/{id}',
+        tags: ['evaluador'],
+        summary: 'One evaluation run with pasos, verdicts and informe',
+      })
+      .input(z.object({ id: z.uuid() }))
+      .output(evaluacionDetalleSchema),
+    list: oc
+      .route({
+        method: 'GET',
+        path: '/evaluaciones',
+        tags: ['evaluador'],
+        summary: 'List evaluation runs of a proyecto',
+      })
+      .input(z.object({ proyectoId: z.uuid() }))
+      .output(z.array(evaluacionSchema)),
+    informeMarkdown: oc
+      .route({
+        method: 'GET',
+        path: '/evaluaciones/{id}/informe.md',
+        tags: ['evaluador'],
+        summary: 'Download the evaluation report as Markdown (E.5.b)',
+      })
+      .input(z.object({ id: z.uuid() }))
+      .output(z.string()),
+    informeCsv: oc
+      .route({
+        method: 'GET',
+        path: '/evaluaciones/{id}/informe.csv',
+        tags: ['evaluador'],
+        summary: 'Download the comparative table as CSV (E.5.b)',
+      })
+      .input(z.object({ id: z.uuid() }))
+      .output(z.string()),
+  },
+
+  /** E.1.b: named process stages. */
+  procesos: {
+    etapas: oc
+      .route({
+        method: 'GET',
+        path: '/procesos/etapas',
+        tags: ['evaluador'],
+        summary: 'List the named process stages catalog',
+      })
+      .output(z.array(procesoEtapaSchema)),
+  },
+
+  /** E.2.b/E.2.c: users, roles and the final decision. */
+  usuarios: {
+    list: oc
+      .route({
+        method: 'GET',
+        path: '/usuarios',
+        tags: ['evaluador'],
+        summary: 'List users with their roles (requires usuario.ver)',
+      })
+      .output(z.array(usuarioSchema)),
+    roles: oc
+      .route({
+        method: 'GET',
+        path: '/usuarios/roles',
+        tags: ['evaluador'],
+        summary: 'List the role catalog',
+      })
+      .output(z.array(rolSchema)),
+    asignarRol: oc
+      .route({
+        method: 'PATCH',
+        path: '/usuarios/{id}/rol',
+        tags: ['evaluador'],
+        summary: 'Assign a role to a user (requires usuario.asignar_rol)',
+      })
+      .input(z.object({ id: z.uuid() }).extend(usuarioRolInput.shape))
+      .output(usuarioSchema),
+  },
+
+  decisiones: {
+    final: oc
+      .route({
+        method: 'POST',
+        path: '/propuestas/{id}/decision',
+        tags: ['evaluador'],
+        summary:
+          'Record the human final decision (requires propuesta.aprobar or propuesta.rechazar)',
+      })
+      .input(
+        z.object({
+          id: z.uuid(),
+          decision: z.enum(['adjudicada', 'rechazada']),
+          comentario: z.string().trim().max(2000).optional(),
+        }),
+      )
+      .output(estatusSchema),
+  },
+
+  alertas: {
+    proveedor: oc
+      .route({
+        method: 'GET',
+        path: '/alertas/{proveedorId}',
+        tags: ['evaluador'],
+        summary: 'Antecedent alerts for one proveedor (E.3.c)',
+      })
+      .input(z.object({ proveedorId: z.uuid() }))
+      .output(z.array(alertaSchema)),
   },
 
   notas: {

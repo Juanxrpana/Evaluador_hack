@@ -16,6 +16,8 @@ export class PostgresProveedorWriter implements ProveedorWriter {
       .values({
         nombre: input.nombre,
         contacto: input.contacto ?? null,
+        rif: input.rif ?? null,
+        ubicacion: input.ubicacion ?? null,
       })
       .returning(['id'])
       .executeTakeFirstOrThrow();
@@ -30,6 +32,14 @@ export class PostgresProveedorWriter implements ProveedorWriter {
 
     if (input.contacto !== undefined) {
       patch.contacto = input.contacto;
+    }
+
+    if (input.rif !== undefined) {
+      patch.rif = input.rif;
+    }
+
+    if (input.ubicacion !== undefined) {
+      patch.ubicacion = input.ubicacion;
     }
 
     const rows = await this.#trx
