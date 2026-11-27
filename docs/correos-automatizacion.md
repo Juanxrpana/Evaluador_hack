@@ -26,10 +26,10 @@ Al terminar la implementación, esto debe funcionar de punta a punta:
 
 **Rutas creadas**
 
-| Capa | Ruta / ubicación |
-|---|---|
-| oRPC / HTTP | `correos.list` → `GET /api/correos/list` |
-| Página web | `apps/web/src/routes/_authed/correos.tsx` → `/_authed/correos` |
+| Capa        | Ruta / ubicación                                               |
+| ----------- | -------------------------------------------------------------- |
+| oRPC / HTTP | `correos.list` → `GET /api/correos/list`                       |
+| Página web  | `apps/web/src/routes/_authed/correos.tsx` → `/_authed/correos` |
 
 ---
 
@@ -266,9 +266,10 @@ export class ImapCorreoProvider implements CorreoProvider {
 
           encontrados.push({
             messageId: String(msg.uid),
-            de: msg.envelope?.from
-              ?.map((m) => `${m.name ?? ''} <${m.address ?? ''}>`.trim())
-              .join(', ') ?? '(sin remitente)',
+            de:
+              msg.envelope?.from
+                ?.map((m) => `${m.name ?? ''} <${m.address ?? ''}>`.trim())
+                .join(', ') ?? '(sin remitente)',
             asunto: msg.envelope?.subject ?? '(sin asunto)',
             fecha: (msg.envelope?.date ?? new Date()).toISOString(),
             carpeta: input.carpeta,
@@ -290,7 +291,9 @@ export class ImapCorreoProvider implements CorreoProvider {
   }
 }
 
-export class CorreoNoDisponibleError extends Error { /* ... */ }
+export class CorreoNoDisponibleError extends Error {
+  /* ... */
+}
 ```
 
 > `extraerAdjuntos()` es una función recursiva privada del adaptador que recorre el árbol
@@ -384,9 +387,11 @@ export const Route = createFileRoute('/_authed/correos')({
 });
 
 function CorreosPage() {
-  const { data: correos, isPending, error } = useQuery(
-    orpc.correos.list.queryOptions({ input: { carpeta: 'INBOX', limite: 50 } }),
-  );
+  const {
+    data: correos,
+    isPending,
+    error,
+  } = useQuery(orpc.correos.list.queryOptions({ input: { carpeta: 'INBOX', limite: 50 } }));
 
   // estados: isPending → 'Buscando…', error → field-error,
   // lista vacía → 'No hay correos con adjuntos.',
@@ -433,13 +438,13 @@ Escenarios a validar manualmente (`pnpm dev` del API y de la web):
 
 ## 10. Notas de seguridad
 
-| Regla | Motivo |
-|---|---|
-| Usar **contraseña de aplicación** revocable, nunca la principal | Contención de incidentes en 10 segundos |
-| Credenciales solo en `apps/api/.env` (gitignored) | El navegador jamás habla con el servidor IMAP |
-| Nunca loguear `IMAP_PASSWORD` | El adaptador solo loguea host/carpeta/resultado |
-| Solo metadatos (`BODYSTRUCTURE`), no bytes | El escaneo de cientos de correos pesa KB, no GB |
-| Ruta tras `authenticated` | Un anónimo no puede hacer que el servidor consulte IMAP |
+| Regla                                                           | Motivo                                                  |
+| --------------------------------------------------------------- | ------------------------------------------------------- |
+| Usar **contraseña de aplicación** revocable, nunca la principal | Contención de incidentes en 10 segundos                 |
+| Credenciales solo en `apps/api/.env` (gitignored)               | El navegador jamás habla con el servidor IMAP           |
+| Nunca loguear `IMAP_PASSWORD`                                   | El adaptador solo loguea host/carpeta/resultado         |
+| Solo metadatos (`BODYSTRUCTURE`), no bytes                      | El escaneo de cientos de correos pesa KB, no GB         |
+| Ruta tras `authenticated`                                       | Un anónimo no puede hacer que el servidor consulte IMAP |
 
 ---
 
