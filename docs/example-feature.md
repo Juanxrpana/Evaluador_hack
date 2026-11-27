@@ -135,7 +135,16 @@ export function createRouter({ users }: RouterDependencies) {
       list: os.users.list.handler(() => users.list()),
       create: os.users.create.handler(async ({ input }) => {
         try {
-          return await users.create(input);
+          const user = await users.create(input);
+
+          recordAuditEvent({
+            action: 'user.create',
+            outcome: 'success',
+            resource: 'user',
+            resourceId: user.id,
+          });
+
+          return user;
         } catch (error) {
           if (error instanceof EmailAlreadyExistsError) {
             throw new ORPCError('CONFLICT', {
@@ -168,7 +177,9 @@ app.use('/api{/*path}', async (req, res, next) => {
 });
 ```
 
-This is registered before `express.json()` deliberately.
+This is registered before `express.json()` deliberately. The surrounding pipeline also applies
+request IDs, Pino access logging, mutation audit, rate limits, Helmet, and CORS; see
+[architecture.md](architecture.md#observability-and-request-safety).
 
 ## 6. Create the typed client
 
@@ -330,6 +341,10 @@ hand. The React client does not require it.
 - [x] `DATABASE_URL` is required; startup verifies `select 1`.
 - [x] Secrets live in ignored `.env` files; examples are safe to commit.
 - [x] Helmet and CORS are enabled.
+- [x] Every request has a request ID and trace ID.
+- [x] Access and audit logs exclude bodies, query strings, and credentials.
+- [x] Mutating requests produce audit events, including 429s.
+- [x] Per-IP global and write rate limits are enabled.
 - [x] Expected 4xx errors are not logged as server incidents.
 - [x] Duplicate emails map to 409.
 - [x] SIGINT/SIGTERM close the HTTP server and destroy the DB pool.
@@ -337,4 +352,5 @@ hand. The React client does not require it.
 - [x] Production rollback requires `ALLOW_DB_ROLLBACK=1`.
 - [x] Test databases must end in `_test`; only a generated schema is dropped.
 - [ ] Add authentication/authorization before exposing mutating endpoints.
+- [ ] Use a shared rate-limit store before running multiple API replicas.
 - [ ] Add CI and deployment migration orchestration.

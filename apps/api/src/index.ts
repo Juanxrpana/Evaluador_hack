@@ -4,6 +4,7 @@ import { createApp } from './app.ts';
 import { env } from './config/env.ts';
 import { createDatabase } from './db/client.ts';
 import { PostgresUserRepository } from './modules/users/postgres-user.repository.ts';
+import { logger } from './observability/logger.ts';
 
 const db = createDatabase({
   connectionString: env.DATABASE_URL,
@@ -11,7 +12,7 @@ const db = createDatabase({
 });
 
 await sql`select 1`.execute(db);
-console.log('Database connection verified');
+logger.info('Database connection verified');
 
 const app = createApp({
   users: new PostgresUserRepository(db),
@@ -19,8 +20,8 @@ const app = createApp({
 const server = createServer(app);
 
 server.listen(env.PORT, () => {
-  console.log(`API listening on http://localhost:${env.PORT}`);
-  console.log(`oRPC/OpenAPI base: http://localhost:${env.PORT}/api`);
+  logger.info({ port: env.PORT }, 'API listening');
+  logger.info({ url: `http://localhost:${env.PORT}/api` }, 'oRPC/OpenAPI base');
 });
 
 let shuttingDown = false;
@@ -31,10 +32,14 @@ function shutdown() {
   }
 
   shuttingDown = true;
+  logger.info('Shutting down');
 
   server.close(async () => {
-    await db.destroy();
-    process.exit(0);
+    try {
+      await db.destroy();
+    } finally {
+      logger.flush(() => process.exit(0));
+    }
   });
 }
 

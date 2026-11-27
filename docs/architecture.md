@@ -60,7 +60,9 @@ sequenceDiagram
   Form->>RHF: submit
   RHF->>RHF: zodResolver(createUserSchema)
   RHF->>O: mutate(values)
-  O->>E: POST /api/users
+  O->>E: POST /api/users + X-Request-Id
+  E->>E: requestId → pino-http → CORS
+  E->>E: no-store → audit → rate limit
   E->>H: handler.handle(req, res)
   H->>H: validate input with contract
   H->>R: users.create({ input })
@@ -76,13 +78,45 @@ sequenceDiagram
   Form->>Form: invalidate orpc.users.key()
 ```
 
+## Observability and request safety
+
+The HTTP pipeline is intentionally separate from the oRPC contract:
+
+1. `requestId` validates or creates `X-Request-Id` and reuses a valid W3C `traceparent` trace ID.
+2. `pino-http` emits one structured access log per request; `/healthz` and CORS preflights are
+   excluded to keep infrastructure noise out of the stream.
+3. `AsyncLocalStorage` carries the request logger, IDs, IP, and user agent to oRPC handlers. This
+   avoids threading a context through `implement(contract)` just to log or audit.
+4. Helmet and CORS apply response headers. CORS exposes the correlation and rate-limit headers to
+   browser clients.
+5. `/api` applies `Cache-Control: no-store`, mutation audit, and per-IP global/write rate limits.
+   Audit runs before the limiters so rejected writes are still recorded.
+6. oRPC remains before `express.json()` because it consumes the raw request body.
+
+Access logs and audit logs are separate streams; audit records carry `audit: true`. Neither stream
+contains request bodies, query strings, cookies, or authorization headers. Domain code emits
+`recordAuditEvent(...)`; future authentication middleware can call `setRequestActor(...)` so later
+events inherit the actor. Audit records are emitted at `info` regardless of `LOG_LEVEL`, so reducing
+access-log volume cannot silently disable the audit stream.
+
+Rate limiting is in-memory and per-process. `TRUST_PROXY` must match the deployment topology; `true`
+is unsafe when clients can reach the API directly because `X-Forwarded-For` becomes spoofable. See
+the README for configuration and shared-store guidance.
+
 ## Error policy
 
-- **400** — input validation failed. Client error; not logged as a server incident.
+- **400** — input validation failed. Client error; logged at `info`, without a stack trace.
 - **409** — duplicate email, mapped from PostgreSQL unique violation to a domain error and then to
   `ORPCError('CONFLICT')`.
 - **404** — no oRPC procedure and no Express route matched.
-- **500** — unexpected server or database error. The `onError` interceptor logs it.
+- **429** — per-IP rate limit exceeded. Logged at `warn`; the JSON body and `Retry-After` header
+  identify the request.
+- **500** — unexpected server or database error. The `onError` interceptor logs it with the request
+  logger, so the record includes the request and trace IDs.
+
+The response header `X-Request-Id` is always present, even when a third-party error body (oRPC or
+body-parser) does not include the ID. Express-owned 404, 429, and 500 envelopes include the ID in
+the body as well.
 
 The OpenAPI handler validates both input and output. If an implementation returns a value that does
 not match the output schema, the contract fails rather than silently leaking inconsistent data.
@@ -97,7 +131,8 @@ not match the output schema, the contract fails rather than silently leaking inc
 - `apps/api/src/modules/users/user.repository.ts` — the persistence port.
 - `apps/api/src/modules/users/postgres-user.repository.ts` — the Postgres adapter and row mapper.
 - `apps/api/src/db/*` — connection, migrations, generated types, startup/shutdown.
-- `apps/api/src/app.ts` — HTTP concerns: Express, CORS, Helmet, handler mounting.
+- `apps/api/src/observability/*` — correlation IDs, structured logging, audit events, rate limits.
+- `apps/api/src/app.ts` — HTTP composition: Express middleware order and handler mounting.
 - `apps/web/src/lib/orpc.ts` — transport and query utilities.
 - `apps/web/src/routes/*` — routing and page composition.
 - `apps/web/src/components/UserForm.tsx` — the form interaction.
@@ -155,12 +190,16 @@ Keeping construction at the edges is what makes the middle replaceable.
 - `.env` is ignored; `.env.example` is the committed template.
 - CORS is restricted by `CORS_ORIGIN`.
 - Helmet is enabled.
+- Every request has an `X-Request-Id` and `X-Trace-Id`; unsafe inbound values are replaced.
+- Logs exclude bodies, query strings, cookies, and authorization headers.
+- Mutating API requests produce an audit record, including rejected and aborted requests.
+- Rate limits apply per IP per process; `TRUST_PROXY` must be configured for the deployment.
 - Expected 4xx errors do not produce server-error logs.
 - Duplicate emails return 409, not 500.
 - SIGINT/SIGTERM close the HTTP server and destroy the DB pool.
 - Test databases must end in `_test`; only a generated schema is dropped.
 - The generated Kysely schema is committed and regenerated with `pnpm db:types`.
-- Authentication, authorization, rate limiting, and CI are explicit follow-ups.
+- Authentication, authorization, a shared rate-limit store, and CI are explicit follow-ups.
 
 ## Why oRPC instead of Axios
 

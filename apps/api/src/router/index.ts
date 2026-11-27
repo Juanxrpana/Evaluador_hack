@@ -2,6 +2,7 @@ import { implement, ORPCError } from '@orpc/server';
 import { contract } from '@repo/contracts';
 import { EmailAlreadyExistsError } from '../modules/users/user.errors.ts';
 import type { UserRepository } from '../modules/users/user.repository.ts';
+import { recordAuditEvent } from '../observability/audit.ts';
 
 export interface RouterDependencies {
   users: UserRepository;
@@ -25,7 +26,16 @@ export function createRouter({ users }: RouterDependencies) {
       list: os.users.list.handler(() => users.list()),
       create: os.users.create.handler(async ({ input }) => {
         try {
-          return await users.create(input);
+          const user = await users.create(input);
+
+          recordAuditEvent({
+            action: 'user.create',
+            outcome: 'success',
+            resource: 'user',
+            resourceId: user.id,
+          });
+
+          return user;
         } catch (error) {
           if (error instanceof EmailAlreadyExistsError) {
             throw new ORPCError('CONFLICT', {

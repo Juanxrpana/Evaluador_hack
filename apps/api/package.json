@@ -24,9 +24,12 @@
     "@repo/contracts": "workspace:*",
     "cors": "catalog:",
     "express": "catalog:",
+    "express-rate-limit": "catalog:",
     "helmet": "catalog:",
     "kysely": "catalog:",
     "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -36,6 +39,7 @@
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "kysely-typegen": "catalog:",
+    "pino-pretty": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

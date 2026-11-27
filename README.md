@@ -25,6 +25,8 @@ is the compiler-checked boundary between the two.
 | Kysely          | 0.29.9                                        |
 | `pg`            | 8.23.1                                        |
 | PGlite          | 0.6.0 (migration tests)                       |
+| Pino            | 10.4.0 / pino-http 11.0.0                     |
+| Rate limiting   | express-rate-limit 8.7.5                      |
 | Vite            | 8.4.0                                         |
 | React           | 19.3.1                                        |
 | TanStack Router | 1.170.46                                      |
@@ -100,6 +102,7 @@ it.
 │  │  │  ├─ app.ts                       # Express + oRPC OpenAPI handler
 │  │  │  ├─ index.ts                     # DB + server bootstrap and shutdown
 │  │  │  ├─ config/env.ts                # Zod-validated environment
+│  │  │  ├─ observability/               # request IDs, logs, audit, rate limits
 │  │  │  ├─ db/
 │  │  │  │  ├─ client.ts                 # Kysely<DB> over pg.Pool
 │  │  │  │  ├─ migrate.ts                # up / down / status CLI
@@ -114,6 +117,7 @@ it.
 │  │  │  └─ scripts/generate-openapi.ts
 │  │  ├─ test/
 │  │  │  ├─ migrations.test.ts           # up → down → up
+│  │  │  ├─ request-id.test.ts           # correlation header validation
 │  │  │  ├─ users.repository.test.ts     # Postgres + Zod round trip
 │  │  │  └─ support/test-database.ts     # PGlite or TEST_DATABASE_URL
 │  │  └─ vitest.config.ts
@@ -180,6 +184,61 @@ React Hook Form
 Client-side validation is convenience. The server always re-validates the same schema. A duplicate
 email violates the database constraint and becomes an HTTP **409**, not a 500.
 
+## Observability and request safety
+
+The Express pipeline is ordered so every request is correlated before anything logs:
+
+1. `requestId` accepts a safe inbound `X-Request-Id` or generates a UUID, and reuses a valid W3C
+   `traceparent` trace ID or generates one.
+2. `pino-http` writes one structured access log per request, excluding `/healthz` and CORS
+   preflights.
+3. `AsyncLocalStorage` exposes the request logger and metadata to oRPC handlers and domain code.
+4. Helmet and CORS run next. CORS exposes `X-Request-Id`, `X-Trace-Id`, `RateLimit`,
+   `RateLimit-Policy`, and `Retry-After` to browser clients.
+5. `/api` requests pass through `Cache-Control: no-store`, the mutation audit middleware, and two
+   per-IP rate limiters (global and write).
+6. The oRPC handler remains before `express.json()`.
+
+Logs are JSON on stdout: one access line per request plus separate `audit: true` records. They
+include `requestId`, `traceId`, method, pathname, IP, user agent, status, and response time. Request
+bodies, query strings, cookies, and authorization headers are deliberately not logged.
+`LOG_PRETTY=true` uses `pino-pretty` only outside production.
+
+Audit middleware records every `POST`/`PUT`/`PATCH`/`DELETE` under `/api`, including rejected
+requests and aborted connections. Domain handlers can emit an explicit event:
+
+```ts
+recordAuditEvent({
+  action: 'user.create',
+  resource: 'user',
+  resourceId: user.id,
+});
+```
+
+Audit records carry the actor ID when `setRequestActor()` is called by future authentication
+middleware. The current implementation records `actorId: null`. Audit records are emitted at
+`info` regardless of the access-log `LOG_LEVEL`, so lowering log volume does not silently disable
+them.
+
+Rate limits default to 120 requests/minute per IP for `/api` and 30 writes/minute per IP. Responses
+include draft-8 `RateLimit` and `RateLimit-Policy` headers; a 429 includes `Retry-After` and a JSON
+body with the request ID. The default store is in-memory and per-process; use a shared store before
+running multiple API replicas.
+
+| Variable               | Default | Purpose                                                     |
+| ---------------------- | ------- | ----------------------------------------------------------- |
+| `LOG_LEVEL`            | `info`  | Pino level: `fatal`, `error`, `warn`, `info`, `debug`, etc. |
+| `LOG_PRETTY`           | `false` | Human-readable dev output; ignored in production.           |
+| `TRUST_PROXY`          | `false` | Express trust-proxy setting used for `req.ip`.              |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | Rate-limit window in milliseconds.                          |
+| `RATE_LIMIT_MAX`       | `120`   | Requests per IP per window for `/api`.                      |
+| `RATE_LIMIT_WRITE_MAX` | `30`    | Writes per IP per window for `/api`.                        |
+
+`TRUST_PROXY` must match the deployment topology. Use `1` behind exactly one reverse proxy, or a
+specific CIDR/`loopback`. Never use `true` when clients can reach the API directly: they could spoof
+`X-Forwarded-For` and bypass per-IP rate limits. Trace IDs are correlation IDs only; there is no
+OpenTelemetry exporter yet.
+
 ## Database workflow
 
 ```bash
@@ -221,8 +280,13 @@ git-ignored because it is derived from the contract.
 - Environment variables are parsed with Zod at process start; missing `DATABASE_URL` fails fast.
 - `.env` files are ignored by git. Only `.env.example` files are committed.
 - Helmet and a configurable CORS origin are enabled.
+- Every request has an `X-Request-Id` and `X-Trace-Id`; valid inbound values are reused, unsafe ones
+  are replaced.
+- Logs exclude bodies, query strings, cookies, and authorization headers; `err.body` is redacted.
+- Mutating API requests produce an audit record, including 429s and aborted connections.
+- Rate limiting is per IP per process; configure `TRUST_PROXY` correctly behind a proxy.
 - The API validates both input and output against the contract.
-- Expected 4xx validation errors are not logged as server incidents; 5xx errors are logged.
+- Expected 4xx validation errors stay at `info` or `warn`; 5xx errors are logged at `error`.
 - Duplicate emails map to a domain error and HTTP 409.
 - SIGINT/SIGTERM close the HTTP server and destroy the database pool.
 - Migrations are never run automatically by the API.
@@ -237,7 +301,9 @@ git-ignored because it is derived from the contract.
 
 This is a starter, not a production deployment:
 
-- There is no authentication, authorization, rate limiting, multi-tenancy, or audit logging.
+- There is no authentication, authorization, or multi-tenancy.
+- Rate limiting is process-local; use a shared store before horizontal scaling. Audit records go to
+  stdout, so ship them to a durable, access-controlled store.
 - There is no CI workflow or application Dockerfile yet; `compose.yaml` only provisions Postgres.
 - TanStack Table and TanStack Form are not included. React Hook Form is the form layer; add Table
   when a real dataset exists.
