@@ -6,6 +6,11 @@ import express from 'express';
 import helmet from 'helmet';
 import type { Auth } from './auth/auth.ts';
 import { env } from './config/env.ts';
+import type { ChatService } from './modules/chat/chat.service.ts';
+import type { DocumentoService } from './modules/documentos/documento.service.ts';
+import type { PropuestaService } from './modules/propuestas/propuesta.service.ts';
+import type { ProyectoService } from './modules/proyectos/proyecto.service.ts';
+import type { ProveedorService } from './modules/proveedores/proveedor.service.ts';
 import type { UserService } from './modules/users/user.service.ts';
 import { auditMutations } from './observability/audit.ts';
 import { errorHandler, notFound } from './observability/error-handler.ts';
@@ -19,6 +24,11 @@ import { createRouter } from './router/index.ts';
 export interface AppDependencies {
   auth: Auth;
   users: UserService;
+  proyectos: ProyectoService;
+  proveedores: ProveedorService;
+  propuestas: PropuestaService;
+  documentos: DocumentoService;
+  chat: ChatService;
 }
 
 export function createApp(dependencies: AppDependencies) {

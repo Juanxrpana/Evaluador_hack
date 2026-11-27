@@ -2,6 +2,8 @@
 
 FROM node:26-slim AS build
 
+ENV ONNXRUNTIME_NODE_INSTALL_CUDA=skip
+
 RUN npm install -g pnpm@12.23.0
 
 WORKDIR /workspace

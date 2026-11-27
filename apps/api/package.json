@@ -17,6 +17,7 @@
     "openapi:generate": "node --env-file-if-exists=.env src/scripts/generate-openapi.ts"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.2",
     "@orpc/contract": "catalog:",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
@@ -31,6 +32,7 @@
     "pg": "catalog:",
     "pino": "catalog:",
     "pino-http": "catalog:",
+    "unpdf": "^2.2.3",
     "zod": "catalog:"
   },
   "devDependencies": {

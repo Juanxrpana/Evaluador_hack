@@ -51,12 +51,28 @@ export interface audit_events {
 }
 
 export interface conocimiento {
+  chunk_index: number | null
   contenido: string
   created_at: Generated<Timestamp>
+  documento_id: string | null
   id: Generated<string>
   metadata: Generated<Json>
   proyecto_id: string
+  tipo: Generated<string>
   titulo: string | null
+}
+
+export interface documento {
+  contenido: Buffer
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  metadata: Generated<Json>
+  mime: string
+  nombre: string
+  propuesta_id: string | null
+  proveedor_id: string | null
+  proyecto_id: string
+  tamano_bytes: Int8
 }
 
 export interface estatus {
@@ -168,6 +184,7 @@ export interface DB {
   accounts: accounts
   audit_events: audit_events
   conocimiento: conocimiento
+  documento: documento
   estatus: estatus
   nota: nota
   permiso: permiso

@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:19-alpine
+    image: pgvector/pgvector:pg19
     container_name: monorepo-postgres
     environment:
       POSTGRES_USER: postgres
@@ -47,8 +47,15 @@ services:
       TRUST_PROXY: '1'
       LOG_LEVEL: info
       LOG_PRETTY: 'false'
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_CHAT_MODEL: ${OPENROUTER_CHAT_MODEL:-google/gemini-2.5-flash}
+      OPENROUTER_VISION_MODEL: ${OPENROUTER_VISION_MODEL:-google/gemini-2.5-flash}
+      EMBEDDING_CACHE_DIR: /models
     ports:
       - '3000:3000'
+    volumes:
+      # bge-m3 model cache so the download happens once, not per container.
+      - models-cache:/models
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,3 +88,4 @@ services:
 
 volumes:
   postgres-data:
+  models-cache:

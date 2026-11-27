@@ -12,3 +12,4 @@ apps/api/openapi.json
 pnpm-debug.log*
 .tanstack/
 .opencode/
+.models/

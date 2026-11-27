@@ -52,10 +52,17 @@ The stack contains:
 
 | Service    | Purpose                                                        |
 | ---------- | -------------------------------------------------------------- |
-| `postgres` | PostgreSQL 19 with the app and `app_test` databases            |
+| `postgres` | PostgreSQL 19 + pgvector with the app and `app_test` databases |
 | `migrate`  | One-shot Kysely migration runner; exits before the API starts  |
 | `api`      | Express + Better Auth + oRPC, built from `apps/api/Dockerfile` |
 | `web`      | Static Vite build served by nginx, proxying `/api` to the API  |
+
+```bash
+# Compose needs a real OpenRouter key for the chat and document analysis:
+OPENROUTER_API_KEY=sk-or-... BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
+PUBLIC_ORIGIN=http://localhost:8080 \
+docker compose up --build
+```
 
 The Compose secret is a local development default. For anything else:
 
@@ -355,17 +362,48 @@ draft-8 `RateLimit` and `RateLimit-Policy` headers; a 429 includes `Retry-After`
 with the request ID. The default stores are in-memory and per-process; use a shared store before
 running multiple API replicas.
 
-| Variable               | Default                 | Purpose                                                     |
-| ---------------------- | ----------------------- | ----------------------------------------------------------- |
-| `BETTER_AUTH_SECRET`   | required                | At least 32 random characters; signs cookies and tokens.    |
-| `BETTER_AUTH_URL`      | `http://localhost:3000` | Public API origin used by Better Auth.                      |
-| `CORS_ORIGIN`          | `http://localhost:5173` | Allowed web origin; also a Better Auth trusted origin.      |
-| `LOG_LEVEL`            | `info`                  | Pino level: `fatal`, `error`, `warn`, `info`, `debug`, etc. |
-| `LOG_PRETTY`           | `false`                 | Human-readable dev output; ignored in production.           |
-| `TRUST_PROXY`          | `false`                 | Express trust-proxy setting used for `req.ip`.              |
-| `RATE_LIMIT_WINDOW_MS` | `60000`                 | Rate-limit window in milliseconds.                          |
-| `RATE_LIMIT_MAX`       | `120`                   | Requests per IP per window for non-auth `/api` traffic.     |
-| `RATE_LIMIT_WRITE_MAX` | `30`                    | Writes per IP per window for non-auth `/api` traffic.       |
+| Variable                  | Default                        | Purpose                                                     |
+| ------------------------- | ------------------------------ | ----------------------------------------------------------- |
+| `BETTER_AUTH_SECRET`      | required                       | At least 32 random characters; signs cookies and tokens.    |
+| `BETTER_AUTH_URL`         | `http://localhost:3000`        | Public API origin used by Better Auth.                      |
+| `CORS_ORIGIN`             | `http://localhost:5173`        | Allowed web origin; also a Better Auth trusted origin.      |
+| `LOG_LEVEL`               | `info`                         | Pino level: `fatal`, `error`, `warn`, `info`, `debug`, etc. |
+| `LOG_PRETTY`              | `false`                        | Human-readable dev output; ignored in production.           |
+| `TRUST_PROXY`             | `false`                        | Express trust-proxy setting used for `req.ip`.              |
+| `RATE_LIMIT_WINDOW_MS`    | `60000`                        | Rate-limit window in milliseconds.                          |
+| `RATE_LIMIT_MAX`          | `120`                          | Requests per IP per window for non-auth `/api` traffic.     |
+| `RATE_LIMIT_WRITE_MAX`    | `30`                           | Writes per IP per window for non-auth `/api` traffic.       |
+| `OPENROUTER_API_KEY`      | required                       | OpenRouter key for chat and vision analysis.                |
+| `OPENROUTER_BASE_URL`     | `https://openrouter.ai/api/v1` | OpenRouter API base.                                        |
+| `OPENROUTER_CHAT_MODEL`   | `google/gemini-2.5-flash`      | Model used for chat answers.                                |
+| `OPENROUTER_VISION_MODEL` | `google/gemini-2.5-flash`      | Model used to describe uploaded images.                     |
+| `AI_TIMEOUT_MS`           | `120000`                       | Abort timeout for OpenRouter calls.                         |
+| `EMBEDDING_MODEL`         | `Xenova/bge-m3`                | Local ONNX embedding model (transformers.js).               |
+| `EMBEDDING_CACHE_DIR`     | `.models`                      | Where the embedding model downloads once.                   |
+| `DOCUMENT_MAX_BYTES`      | `15728640`                     | Max upload size (15 MiB).                                   |
+
+## AI chat and the vectorized knowledge base
+
+The evaluator domain is AI-first: uploaded documents and supplier cost histories become
+`conocimiento` rows embedded with **bge-m3 (1024 dims)** and searched with **pgvector** (cosine
+distance, HNSW index). OpenRouter handles generation only: chat answers and image descriptions.
+
+Flow:
+
+1. Upload a PDF (parsed locally with `unpdf`) or an image (described by the vision model) against
+   a proyecto. The file is stored durably in the `documento` table; its text is chunked, embedded,
+   and stored as `conocimiento` scoped to that proyecto.
+2. When the upload names a proveedor, their cost history (propuestas + recargos across every
+   proyecto) is rebuilt from SQL and stored as `proveedor_historial` knowledge chunks.
+3. `POST /api/chat/ask` embeds the question, retrieves the top chunks of that proyecto only
+   (`conocimiento.proyecto_id` is a NOT NULL foreign key, so the chat never crosses projects), and
+   injects the live supplier cost history when the question targets a propuesta.
+
+Embeddings run locally in the API process (ONNX, CPU) — no embedding API key. The model downloads
+once into `EMBEDDING_CACHE_DIR`; in Compose it lives in the `models-cache` volume. The Compose
+Postgres is `pgvector/pgvector:pg19` because the stock image lacks the vector extension. Migration
+tests on PGlite skip the vector columns (guarded by extension availability); vector reads/writes go
+through raw SQL in `postgres-conocimiento.search.ts` / `postgres-conocimiento.writer.ts`.
 
 `TRUST_PROXY` must match the deployment topology. Use `1` behind exactly one reverse proxy, or a
 specific CIDR/`loopback`. Never use `true` when clients can reach the API directly: they could spoof

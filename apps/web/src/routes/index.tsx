@@ -9,6 +9,6 @@ export const Route = createFileRoute('/')({
   beforeLoad: async ({ context }) => {
     const session = await context.queryClient.fetchQuery(sessionQueryOptions);
 
-    throw redirect({ to: session ? '/users' : '/login' });
+    throw redirect({ to: session ? '/proyectos' : '/login' });
   },
 });

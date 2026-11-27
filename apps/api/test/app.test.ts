@@ -13,6 +13,10 @@ import type { UserTransaction } from '../src/modules/users/user.transaction.ts';
 import { UserService } from '../src/modules/users/user.service.ts';
 import { createTestDatabase, type TestDatabase } from './support/test-database.ts';
 
+// The auth-boundary tests never touch evaluator routes, so the app is
+// composed with stub services to keep this suite focused and fast.
+const stub = <T>(): T => ({}) as T;
+
 let testDb: TestDatabase;
 let auth: Auth;
 let server: Server;
@@ -40,7 +44,15 @@ beforeAll(async () => {
     })),
   );
 
-  const app = createApp({ auth, users });
+  const app = createApp({
+    auth,
+    users,
+    proyectos: stub(),
+    proveedores: stub(),
+    propuestas: stub(),
+    documentos: stub(),
+    chat: stub(),
+  });
 
   server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));

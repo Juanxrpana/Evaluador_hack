@@ -1,11 +1,46 @@
 import { createServer } from 'node:http';
 import { sql } from 'kysely';
 import { createApp } from './app.ts';
-import { createAuth } from './auth/auth.ts';
 import { env } from './config/env.ts';
+import { createAuth } from './auth/auth.ts';
 import { createDatabase } from './db/client.ts';
 import { createTransactionRunner } from './db/transaction.ts';
+import { LocalBgeM3EmbeddingClient } from './modules/ai/local-bge.embedding.client.ts';
+import { OpenRouterLlmClient } from './modules/ai/openrouter-llm.client.ts';
 import { PostgresAuditWriter } from './modules/audit/postgres-audit.writer.ts';
+import { ChatService } from './modules/chat/chat.service.ts';
+import type {
+  DocumentoTransaction,
+  DocumentoTransactionRunner,
+} from './modules/documentos/documento.transaction.ts';
+import { DocumentoService } from './modules/documentos/documento.service.ts';
+import { PostgresDocumentoReader } from './modules/documentos/postgres-documento.reader.ts';
+import { PostgresConocimientoSearch } from './modules/documentos/postgres-conocimiento.search.ts';
+import { PostgresConocimientoWriter } from './modules/documentos/postgres-conocimiento.writer.ts';
+import { PostgresDocumentoWriter } from './modules/documentos/postgres-documento.writer.ts';
+import { ImagenDescriber } from './modules/documentos/imagen.describer.ts';
+import { PdfExtractor } from './modules/documentos/pdf.extractor.ts';
+import { PostgresProveedorReader } from './modules/proveedores/postgres-proveedor.reader.ts';
+import type {
+  ProveedorTransaction,
+  ProveedorTransactionRunner,
+} from './modules/proveedores/proveedor.transaction.ts';
+import { PostgresProveedorWriter } from './modules/proveedores/postgres-proveedor.writer.ts';
+import { ProveedorService } from './modules/proveedores/proveedor.service.ts';
+import { PostgresPropuestaReader } from './modules/propuestas/postgres-propuesta.reader.ts';
+import type {
+  PropuestaTransaction,
+  PropuestaTransactionRunner,
+} from './modules/propuestas/propuesta.transaction.ts';
+import { PostgresPropuestaWriter } from './modules/propuestas/postgres-propuesta.writer.ts';
+import { PropuestaService } from './modules/propuestas/propuesta.service.ts';
+import { PostgresProyectoReader } from './modules/proyectos/postgres-proyecto.reader.ts';
+import type {
+  ProyectoTransaction,
+  ProyectoTransactionRunner,
+} from './modules/proyectos/proyecto.transaction.ts';
+import { PostgresProyectoWriter } from './modules/proyectos/postgres-proyecto.writer.ts';
+import { ProyectoService } from './modules/proyectos/proyecto.service.ts';
 import { PostgresUserReader } from './modules/users/postgres-user.reader.ts';
 import { PostgresUserWriter } from './modules/users/postgres-user.writer.ts';
 import type { UserTransaction, UserTransactionRunner } from './modules/users/user.transaction.ts';
@@ -23,20 +58,94 @@ const db = createDatabase({
 await sql`select 1`.execute(db);
 logger.info('Database connection verified');
 
+// AI clients: OpenRouter for chat/vision, local bge-m3 for embeddings.
+const llm = new OpenRouterLlmClient();
+const embeddings = new LocalBgeM3EmbeddingClient();
+
+function auditContext() {
+  const context = getRequestContext();
+
+  return {
+    actorId: context?.actorId,
+    requestId: context?.requestId,
+    traceId: context?.traceId,
+  };
+}
+
 const runInUserTransaction: UserTransactionRunner = createTransactionRunner<UserTransaction>(
   db,
-  (trx) => {
-    const context = getRequestContext();
+  (trx) => ({
+    users: new PostgresUserWriter(trx),
+    audit: new PostgresAuditWriter(trx, auditContext()),
+  }),
+);
 
-    return {
-      users: new PostgresUserWriter(trx),
-      audit: new PostgresAuditWriter(trx, {
-        actorId: context?.actorId,
-        requestId: context?.requestId,
-        traceId: context?.traceId,
-      }),
-    };
+const runInProyectoTransaction: ProyectoTransactionRunner =
+  createTransactionRunner<ProyectoTransaction>(db, (trx) => ({
+    proyectos: new PostgresProyectoWriter(trx),
+    audit: new PostgresAuditWriter(trx, auditContext()),
+  }));
+
+const runInProveedorTransaction: ProveedorTransactionRunner =
+  createTransactionRunner<ProveedorTransaction>(db, (trx) => ({
+    proveedores: new PostgresProveedorWriter(trx),
+    audit: new PostgresAuditWriter(trx, auditContext()),
+  }));
+
+const runInPropuestaTransaction: PropuestaTransactionRunner =
+  createTransactionRunner<PropuestaTransaction>(db, (trx) => ({
+    propuestas: new PostgresPropuestaWriter(trx),
+    audit: new PostgresAuditWriter(trx, auditContext()),
+  }));
+
+const runInDocumentoTransaction: DocumentoTransactionRunner =
+  createTransactionRunner<DocumentoTransaction>(db, (trx) => ({
+    documentos: new PostgresDocumentoWriter(trx),
+    conocimiento: new PostgresConocimientoWriter(trx),
+    audit: new PostgresAuditWriter(trx, auditContext()),
+  }));
+
+const proyectoReader = new PostgresProyectoReader(db);
+const proveedorReader = new PostgresProveedorReader(db);
+const propuestaReader = new PostgresPropuestaReader(db);
+
+const proyectos = new ProyectoService(proyectoReader, runInProyectoTransaction);
+const proveedores = new ProveedorService(proveedorReader, runInProveedorTransaction);
+const propuestas = new PropuestaService(
+  propuestaReader,
+  runInPropuestaTransaction,
+  proyectoReader,
+  proveedorReader,
+);
+
+// PDFs parse locally; images go through the vision model.
+const extractor = {
+  async extraer(input: { nombre: string; mime: string; bytes: Buffer }): Promise<string> {
+    if (input.mime === 'application/pdf') {
+      return new PdfExtractor().extraer(input);
+    }
+
+    return new ImagenDescriber(llm).extraer(input);
   },
+};
+
+const documentos: DocumentoService = new DocumentoService(
+  new PostgresDocumentoReader(db),
+  runInDocumentoTransaction,
+  proyectoReader,
+  propuestaReader,
+  proveedorReader,
+  extractor,
+  embeddings,
+);
+
+const chat: ChatService = new ChatService(
+  proyectoReader,
+  propuestaReader,
+  proveedorReader,
+  new PostgresConocimientoSearch(db),
+  embeddings,
+  llm,
 );
 
 const app = createApp({
@@ -46,6 +155,11 @@ const app = createApp({
     trustedOrigins: [env.CORS_ORIGIN],
   }),
   users: new UserService(new PostgresUserReader(db), runInUserTransaction),
+  proyectos,
+  proveedores,
+  propuestas,
+  documentos,
+  chat,
 });
 const server = createServer(app);
 

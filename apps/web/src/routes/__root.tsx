@@ -28,6 +28,12 @@ function RootLayout() {
           Monorepo
         </Link>
         <nav className="app-nav">
+          <Link to="/proyectos" activeProps={{ className: 'active' }}>
+            Proyectos
+          </Link>
+          <Link to="/proveedores" activeProps={{ className: 'active' }}>
+            Proveedores
+          </Link>
           <Link to="/users" activeProps={{ className: 'active' }}>
             Users
           </Link>

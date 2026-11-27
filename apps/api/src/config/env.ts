@@ -33,6 +33,22 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
   RATE_LIMIT_WRITE_MAX: z.coerce.number().int().positive().default(30),
+  // OpenRouter (chat + vision). The API is the only process that talks to it.
+  OPENROUTER_API_KEY: z.string().min(1, 'OPENROUTER_API_KEY is required'),
+  OPENROUTER_BASE_URL: z.url().default('https://openrouter.ai/api/v1'),
+  OPENROUTER_CHAT_MODEL: z.string().default('google/gemini-2.5-flash'),
+  OPENROUTER_VISION_MODEL: z.string().default('google/gemini-2.5-flash'),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  // Local bge-m3 embeddings (transformers.js). No external API involved.
+  EMBEDDING_MODEL: z.string().default('Xenova/bge-m3'),
+  EMBEDDING_CACHE_DIR: z.string().default('.models'),
+  EMBEDDING_MAX_CHARS: z.coerce.number().int().positive().default(8192),
+  // Document ingestion limits.
+  DOCUMENT_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(15 * 1024 * 1024),
 });
 
 export const env = envSchema.parse(process.env);
