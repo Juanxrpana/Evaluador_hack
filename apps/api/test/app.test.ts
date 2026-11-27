@@ -56,6 +56,7 @@ beforeAll(async () => {
     estatus: stub(),
     recargos: stub(),
     conocimiento: stub(),
+    tasa: stub(),
   });
 
   server = createServer(app);

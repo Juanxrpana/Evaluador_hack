@@ -64,6 +64,7 @@ import { PostgresUserReader } from './modules/users/postgres-user.reader.ts';
 import { PostgresUserWriter } from './modules/users/postgres-user.writer.ts';
 import type { UserTransaction, UserTransactionRunner } from './modules/users/user.transaction.ts';
 import { UserService } from './modules/users/user.service.ts';
+import { TasaBcvService } from './modules/tasa/tasa-bcv.service.ts';
 import { logger } from './observability/logger.ts';
 import { getRequestContext } from './observability/request-context.ts';
 
@@ -199,6 +200,7 @@ const estatus = new EstatusService(
 );
 const recargos = new PostgresRecargoReader(db);
 const conocimiento = new ConocimientoListService(new PostgresConocimientoListReader(db));
+const tasa = new TasaBcvService();
 
 const app = createApp({
   auth: createAuth(db, {
@@ -216,6 +218,7 @@ const app = createApp({
   estatus,
   recargos,
   conocimiento,
+  tasa,
 });
 const server = createServer(app);
 

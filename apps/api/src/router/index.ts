@@ -29,6 +29,8 @@ import { NotaNoEncontradaError } from '../modules/notas/nota.service.ts';
 import type { RecargoReader } from '../modules/recargos/recargo.reader.ts';
 import type { ConocimientoListService } from '../modules/documentos/conocimiento.list.ts';
 import { DocumentoNoEncontradoError } from '../modules/documentos/documento.service.ts';
+import type { TasaBcvService } from '../modules/tasa/tasa-bcv.service.ts';
+import { TasaNoDisponibleError } from '../modules/tasa/tasa-bcv.service.ts';
 
 export interface ApiContext {
   session: Awaited<ReturnType<Auth['api']['getSession']>>;
@@ -45,6 +47,7 @@ export interface RouterDependencies {
   estatus: EstatusService;
   recargos: RecargoReader;
   conocimiento: ConocimientoListService;
+  tasa: TasaBcvService;
 }
 
 /** Expected domain failures become typed 4xx responses; nothing else escapes. */
@@ -98,6 +101,10 @@ function mapDomainError(error: unknown): never {
     });
   }
 
+  if (error instanceof TasaNoDisponibleError) {
+    throw new ORPCError('SERVICE_UNAVAILABLE', { message: error.message });
+  }
+
   // Unknown failures keep the safe message but never lose their cause.
   getRequestLogger().error({ err: error }, 'unmapped domain error');
   throw new ORPCError('INTERNAL', { message: 'Unexpected server error' });
@@ -118,6 +125,7 @@ export function createRouter({
   estatus,
   recargos,
   conocimiento,
+  tasa,
 }: RouterDependencies) {
   const os = implement(contract).$context<ApiContext>();
 
@@ -136,6 +144,17 @@ export function createRouter({
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     })),
+
+    tasa: {
+      bcv: os.tasa.bcv.use(authenticated).handler(async () => {
+        try {
+          const { tasa: actual } = await tasa.obtener();
+          return actual;
+        } catch (error) {
+          return mapDomainError(error);
+        }
+      }),
+    },
 
     users: {
       list: os.users.list.use(authenticated).handler(() => users.list()),

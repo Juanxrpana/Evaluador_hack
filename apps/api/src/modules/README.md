@@ -16,6 +16,7 @@ Cada submódulo implementa un caso de uso con el patrón reader/writer/service/t
 - [proveedores](./proveedores/README.md): directorio e historial de costos.
 - [proyectos](./proyectos/README.md): raíz del dominio.
 - [recargos](./recargos/README.md): cargos extraídos por propuesta.
+- [tasa](./tasa/README.md): tasa BCV de referencia para presentar montos en bolívares.
 - [users](./users/README.md): usuarios del starter y patrón de transacción.
 
 ## Global Invariants

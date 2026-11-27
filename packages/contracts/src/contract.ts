@@ -26,6 +26,7 @@ import {
   propuestaSchema,
   propuestaUpdate,
   recargoSchema,
+  tasaBcvSchema,
 } from './schemas/evaluador.ts';
 
 /**
@@ -361,6 +362,18 @@ export const contract = {
       })
       .input(chatAskInput)
       .output(chatResponseSchema),
+  },
+
+  /** Reference rate for presentation: amounts are stored in USD, VES is derived. */
+  tasa: {
+    bcv: oc
+      .route({
+        method: 'GET',
+        path: '/tasa/bcv',
+        tags: ['evaluador'],
+        summary: 'Get the current BCV USD reference rate',
+      })
+      .output(tasaBcvSchema),
   },
 };
 

@@ -15,6 +15,7 @@ import type { PropuestaService } from './modules/propuestas/propuesta.service.ts
 import type { ProyectoService } from './modules/proyectos/proyecto.service.ts';
 import type { ProveedorService } from './modules/proveedores/proveedor.service.ts';
 import type { RecargoReader } from './modules/recargos/recargo.reader.ts';
+import type { TasaBcvService } from './modules/tasa/tasa-bcv.service.ts';
 import type { UserService } from './modules/users/user.service.ts';
 import { auditMutations } from './observability/audit.ts';
 import { errorHandler, notFound } from './observability/error-handler.ts';
@@ -37,6 +38,7 @@ export interface AppDependencies {
   estatus: EstatusService;
   recargos: RecargoReader;
   conocimiento: ConocimientoListService;
+  tasa: TasaBcvService;
 }
 
 export function createApp(dependencies: AppDependencies) {
