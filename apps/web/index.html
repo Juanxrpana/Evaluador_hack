@@ -1,10 +1,29 @@
 <!doctype html>
-<html lang="en">
+<html lang="es" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Contract-first monorepo starter" />
-    <title>Monorepo Starter</title>
+    <meta
+      name="description"
+      content="Sistema de evaluación de propuestas de laboratorio: proyectos, proveedores, documentos y dictámenes."
+    />
+    <meta name="theme-color" content="#080a09" />
+    <title>Evaluador · Propuestas de laboratorio</title>
+    <script>
+      try {
+        var params = new URLSearchParams(location.search);
+        var porUrl = params.get('tema');
+        var tema =
+          porUrl === 'claro'
+            ? 'light'
+            : porUrl === 'oscuro'
+              ? 'dark'
+              : localStorage.getItem('evaluador.tema');
+        if (tema === 'light') document.documentElement.dataset.theme = 'light';
+      } catch (error) {
+        /* sin preferencia guardada */
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
+import { PageHead, Panel } from '../../components/ui';
 import { messageOf } from '../../lib/errors';
+import { fecha, monto } from '../../lib/format';
 import { orpc } from '../../lib/orpc';
 
 export const Route = createFileRoute('/_authed/proveedores')({
@@ -40,64 +42,120 @@ function ProveedoresPage() {
   );
 
   return (
-    <section className="stack">
-      <p className="eyebrow">Evaluador</p>
-      <h1>Proveedores</h1>
-      <p className="lede">
-        El historial de costos se deriva de las propuestas y de los recargos que la IA extrae de sus
-        documentos. Se guarda vectorizado en la base de conocimiento de los proyectos.
-      </p>
+    <div className="stack">
+      <PageHead
+        title="Proveedores"
+        lede="El historial de costos se deriva de las propuestas y de los recargos que se extraen de sus documentos."
+      />
 
-      <form
-        className="form-panel"
-        onSubmit={(event) => {
-          event.preventDefault();
-          crear.mutate({ nombre, ...(contacto.trim() ? { contacto: contacto.trim() } : {}) });
-        }}
-      >
-        <div className="field">
-          <label htmlFor="proveedor-nombre">Nombre</label>
-          <input
-            id="proveedor-nombre"
-            value={nombre}
-            onChange={(event) => setNombre(event.target.value)}
-            required
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="proveedor-contacto">Contacto (opcional)</label>
-          <input
-            id="proveedor-contacto"
-            value={contacto}
-            onChange={(event) => setContacto(event.target.value)}
-          />
-        </div>
-        {error && <p className="field-error">{error}</p>}
-        <button type="submit" disabled={crear.isPending || nombre.trim().length === 0}>
-          {crear.isPending ? 'Registrando…' : 'Registrar proveedor'}
-        </button>
-      </form>
+      <div className="home-grid">
+        <Panel
+          title="Proveedores registrados"
+          aside={
+            <span className="panel__meta">
+              {proveedores?.length ?? 0}{' '}
+              {(proveedores?.length ?? 0) === 1 ? 'registrado' : 'registrados'}
+            </span>
+          }
+        >
+          {(proveedores ?? []).length === 0 ? (
+            <p className="fine">
+              Aún no hay proveedores. Registra el primero para asociarlo a una propuesta.
+            </p>
+          ) : (
+            <ul className="user-list">
+              {(proveedores ?? []).map((proveedor) => (
+                <FilaProveedor
+                  key={proveedor.id}
+                  proveedor={proveedor}
+                  onChanged={invalidar}
+                  onVerHistorial={setSeleccionado}
+                />
+              ))}
+            </ul>
+          )}
+        </Panel>
 
-      <ul className="user-list">
-        {(proveedores ?? []).map((proveedor) => (
-          <FilaProveedor
-            key={proveedor.id}
-            proveedor={proveedor}
-            onChanged={invalidar}
-            onVerHistorial={setSeleccionado}
-          />
-        ))}
-      </ul>
+        <Panel title="Nuevo proveedor">
+          <form
+            className="form-stack"
+            onSubmit={(event) => {
+              event.preventDefault();
+              crear.mutate({ nombre, ...(contacto.trim() ? { contacto: contacto.trim() } : {}) });
+            }}
+          >
+            <div className="field">
+              <label htmlFor="proveedor-nombre">Nombre</label>
+              <input
+                id="proveedor-nombre"
+                value={nombre}
+                onChange={(event) => setNombre(event.target.value)}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="proveedor-contacto">Contacto (opcional)</label>
+              <input
+                id="proveedor-contacto"
+                value={contacto}
+                onChange={(event) => setContacto(event.target.value)}
+              />
+            </div>
+            {error && <p className="field-error">{error}</p>}
+            <button type="submit" disabled={crear.isPending || nombre.trim().length === 0}>
+              {crear.isPending ? 'Registrando…' : 'Registrar proveedor'}
+            </button>
+          </form>
+        </Panel>
+      </div>
 
-      {seleccionado && historial && (
-        <form className="form-panel" onSubmit={(event) => event.preventDefault()}>
-          <h2>Historial de costos: {historial.proveedor.nombre}</h2>
-          <p className="lede">
-            {historial.resumen.totalPropuestas} propuestas · promedio{' '}
-            {historial.resumen.montoPromedio ?? 'n/d'} · mínimo{' '}
-            {historial.resumen.montoMinimo ?? 'n/d'} · máximo{' '}
-            {historial.resumen.montoMaximo ?? 'n/d'} · último{' '}
-            {historial.resumen.ultimoMonto ?? 'n/d'}
+      {seleccionado && historial ? (
+        <Panel
+          title={`Historial de costos · ${historial.proveedor.nombre}`}
+          aside={
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={() => setSeleccionado(null)}
+            >
+              Cerrar
+            </button>
+          }
+        >
+          <div className="readout readout--four" role="list" aria-label="Resumen de costos">
+            <div className="readout__item" role="listitem">
+              <span className="readout__label">Propuestas</span>
+              <span className="readout__value readout__value--small">
+                {historial.resumen.totalPropuestas}
+              </span>
+              <span className="readout__note">Con monto registrado</span>
+            </div>
+            <div className="readout__item" role="listitem">
+              <span className="readout__label">Promedio</span>
+              <span className="readout__value readout__value--small">
+                {monto(historial.resumen.montoPromedio)}
+              </span>
+              <span className="readout__note">Monto base</span>
+            </div>
+            <div className="readout__item" role="listitem">
+              <span className="readout__label">Mínimo</span>
+              <span className="readout__value readout__value--small">
+                {monto(historial.resumen.montoMinimo)}
+              </span>
+              <span className="readout__note">Oferta más baja</span>
+            </div>
+            <div className="readout__item" role="listitem">
+              <span className="readout__label">Máximo</span>
+              <span className="readout__value readout__value--small">
+                {monto(historial.resumen.montoMaximo)}
+              </span>
+              <span className="readout__note">Oferta más alta</span>
+            </div>
+          </div>
+
+          <p className="fine">
+            Último monto registrado: {monto(historial.resumen.ultimoMonto)}. Los recargos se
+            muestran aparte cuando el documento los declara.
           </p>
 
           <ul className="user-list">
@@ -106,25 +164,23 @@ function ProveedoresPage() {
                 <div>
                   <strong>{entrada.proyectoNombre}</strong>
                   <span>
-                    Monto {entrada.monto ?? 'n/d'}
+                    Monto {monto(entrada.monto)}
                     {entrada.recargos.length > 0
-                      ? ` + recargos aparte: ${entrada.recargos
-                          .map((recargo) => `${recargo.concepto} ${recargo.monto}`)
+                      ? ` · recargos aparte: ${entrada.recargos
+                          .map((recargo) => `${recargo.concepto} ${monto(recargo.monto)}`)
                           .join(', ')}`
                       : entrada.recargosTotal !== '0.00'
-                        ? ` + recargos ${entrada.recargosTotal}`
+                        ? ` · recargos ${monto(entrada.recargosTotal)}`
                         : ''}
                   </span>
                 </div>
-                <time dateTime={entrada.createdAt}>
-                  {new Date(entrada.createdAt).toLocaleDateString()}
-                </time>
+                <time dateTime={entrada.createdAt}>{fecha(entrada.createdAt)}</time>
               </li>
             ))}
           </ul>
-        </form>
-      )}
-    </section>
+        </Panel>
+      ) : null}
+    </div>
   );
 }
 
@@ -164,7 +220,7 @@ function FilaProveedor({
     return (
       <li>
         <form
-          className="stack"
+          className="form-stack"
           style={{ width: '100%' }}
           onSubmit={(event) => {
             event.preventDefault();
@@ -175,12 +231,24 @@ function FilaProveedor({
             });
           }}
         >
-          <input value={nombre} onChange={(event) => setNombre(event.target.value)} required />
-          <input
-            value={contacto}
-            onChange={(event) => setContacto(event.target.value)}
-            placeholder="Contacto"
-          />
+          <div className="field">
+            <label htmlFor={`editar-proveedor-${proveedor.id}`}>Nombre</label>
+            <input
+              id={`editar-proveedor-${proveedor.id}`}
+              value={nombre}
+              onChange={(event) => setNombre(event.target.value)}
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor={`editar-contacto-${proveedor.id}`}>Contacto</label>
+            <input
+              id={`editar-contacto-${proveedor.id}`}
+              value={contacto}
+              onChange={(event) => setContacto(event.target.value)}
+              placeholder="Contacto"
+            />
+          </div>
           {error && <p className="field-error">{error}</p>}
           <div className="acciones">
             <button type="submit" disabled={actualizar.isPending}>

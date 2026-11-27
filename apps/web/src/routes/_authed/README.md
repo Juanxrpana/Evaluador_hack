@@ -6,7 +6,8 @@ Pantallas protegidas por el guard `_authed`. Consumen la API con `orpc` y TanSta
 
 ## Interface
 
-- `proyectos.tsx`: lista, alta, edición y borrado de proyectos; enlaza al detalle.
+- `proyectos.tsx`: layout de `/proyectos`; renderiza `<Outlet />` para la lista y el detalle.
+- `proyectos.index.tsx`: lista, alta, edición y borrado de proyectos; enlaza al detalle.
 - `proyectos.$id.tsx`: detalle de un proyecto (propuestas, proveedores, documentos, conocimiento, recargos, notas, estatus y chat).
 - `proveedores.tsx`: directorio e historial de proveedores.
 - `users.tsx`: lista de usuarios autenticados.

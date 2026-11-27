@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState, type FormEvent } from 'react';
 import type { Propuesta, Proveedor } from '@repo/contracts';
 import { messageOf } from '../../lib/errors';
+import { monto as montoTexto } from '../../lib/format';
 import { orpc } from '../../lib/orpc';
 
 export const Route = createFileRoute('/_authed/proyectos/$id')({
@@ -49,7 +50,7 @@ function ProyectoDetallePage() {
   }
 
   return (
-    <section className="stack">
+    <div className="stack">
       <CabeceraProyecto
         proyectoId={id}
         nombre={proyecto.nombre}
@@ -57,18 +58,19 @@ function ProyectoDetallePage() {
         onDeleted={() => navegar({ to: '/proyectos' })}
       />
 
-      <ProveedoresPanel proveedores={proveedores ?? []} />
+      <div className="home-grid">
+        <ProveedoresPanel proveedores={proveedores ?? []} />
+        <DocumentosPanel
+          proyectoId={id}
+          propuestas={propuestas ?? []}
+          proveedores={proveedores ?? []}
+          documentos={documentos ?? []}
+          onChanged={invalidar}
+        />
+      </div>
 
-      <DocumentosPanel
-        proyectoId={id}
-        propuestas={propuestas ?? []}
-        proveedores={proveedores ?? []}
-        documentos={documentos ?? []}
-        onChanged={invalidar}
-      />
-
-      <div className="stack">
-        <h2 style={{ margin: 0 }}>Propuestas</h2>
+      <section className="stack">
+        <h2 className="section-title">Propuestas</h2>
         {(propuestas ?? []).map((propuesta) => (
           <PropuestaCard
             key={propuesta.id}
@@ -79,15 +81,16 @@ function ProyectoDetallePage() {
         ))}
         {(propuestas ?? []).length === 0 && (
           <p className="lede">
-            Sin propuestas todavía: registra un proveedor y crea una propuesta.
+            Sin propuestas todavía: registra un proveedor y sube el documento de su oferta.
           </p>
         )}
+      </section>
+
+      <div className="home-grid">
+        <ChatDelProyecto proyectoId={id} />
+        <ConocimientoPanel chunks={conocimiento ?? []} />
       </div>
-
-      <ChatDelProyecto proyectoId={id} />
-
-      <ConocimientoPanel chunks={conocimiento ?? []} />
-    </section>
+    </div>
   );
 }
 
@@ -126,7 +129,6 @@ function CabeceraProyecto({
 
   return (
     <div className="stack">
-      <p className="eyebrow">Proyecto</p>
       {editando ? (
         <form
           className="form-panel"
@@ -275,20 +277,28 @@ function DocumentosPanel({
   const [propuestaId, setPropuestaId] = useState('');
   const [proveedorId, setProveedorId] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<string | null>(null);
 
   const subir = useMutation(
     orpc.documentos.upload.mutationOptions({
-      onSuccess: (resultado) => {
+      onSuccess: (respuesta) => {
         setArchivo(null);
         setError(null);
-        if (resultado.extraccion) {
-          window.alert(
-            `IA: monto ${resultado.extraccion.montoTotal ?? 'no detectado'}; ${resultado.extraccion.recargos} recargos registrados.`,
-          );
-        }
+        setResultado(
+          respuesta.extraccion
+            ? `Lectura completada: monto ${
+                respuesta.extraccion.montoTotal
+                  ? montoTexto(respuesta.extraccion.montoTotal)
+                  : 'no detectado'
+              }; ${respuesta.extraccion.recargos} recargos registrados.`
+            : 'Documento guardado. La extracción no devolvió un monto.',
+        );
         return onChanged();
       },
-      onError: (cause) => setError(messageOf(cause)),
+      onError: (cause) => {
+        setResultado(null);
+        setError(messageOf(cause));
+      },
     }),
   );
 
@@ -312,12 +322,13 @@ function DocumentosPanel({
     }
 
     setError(null);
+    setResultado(null);
 
     const contenidoBase64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.addEventListener('load', () => {
-        const resultado = String(reader.result);
-        resolve(resultado.slice(resultado.indexOf(',') + 1));
+        const contenidoLeido = String(reader.result);
+        resolve(contenidoLeido.slice(contenidoLeido.indexOf(',') + 1));
       });
       reader.addEventListener('error', () => reject(new Error('No se pudo leer el archivo')));
       reader.readAsDataURL(archivo);
@@ -392,6 +403,12 @@ function DocumentosPanel({
       <button type="submit" disabled={subir.isPending || !archivo}>
         {subir.isPending ? 'Procesando documento…' : 'Subir y vectorizar'}
       </button>
+
+      {resultado ? (
+        <div className="notice" role="status">
+          <p>{resultado}</p>
+        </div>
+      ) : null}
 
       <ul className="user-list">
         {documentos.map((documento) => (
@@ -576,7 +593,9 @@ function PropuestaCard({
       <ul className="sub-lista">
         {(estatuses ?? []).map((item) => (
           <li key={item.id}>
-            <strong>Estado {item.estado}</strong>
+            <strong>
+              Estado <span className="badge">código {item.estado}</span>
+            </strong>
             <span>
               {item.comentario ?? 'sin comentario'}
               <button
@@ -682,7 +701,7 @@ function ChatDelProyecto({ proyectoId }: { proyectoId: string }) {
 
       <div className="stack">
         {mensajes.map((mensaje) => (
-          <div className="chat-bubble" key={mensaje.id}>
+          <div className={`chat-bubble chat-bubble--${mensaje.rol}`} key={mensaje.id}>
             <strong>{mensaje.rol === 'usuario' ? 'Tú' : 'Asistente'}</strong>
             <p>{mensaje.texto}</p>
             {mensaje.fuentes && mensaje.fuentes.length > 0 && (

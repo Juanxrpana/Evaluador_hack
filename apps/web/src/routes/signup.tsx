@@ -1,4 +1,5 @@
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { PageHead } from '../components/ui';
 import { SignUpForm } from '../components/AuthForm';
 import { sessionQueryOptions } from '../lib/session';
 
@@ -7,7 +8,7 @@ export const Route = createFileRoute('/signup')({
     const session = await context.queryClient.fetchQuery(sessionQueryOptions);
 
     if (session) {
-      throw redirect({ to: '/users' });
+      throw redirect({ to: '/proyectos' });
     }
   },
   component: SignUpPage,
@@ -16,17 +17,15 @@ export const Route = createFileRoute('/signup')({
 function SignUpPage() {
   return (
     <section className="stack auth-page">
-      <p className="eyebrow">Create an account</p>
-      <h1>Sign up</h1>
-      <p className="lede">
-        Email and password only for now. The same account table can hold OAuth providers later
-        without another schema migration.
-      </p>
+      <PageHead
+        title="Crear cuenta"
+        lede="Nombre, correo y contraseña. La cuenta se usa para registrar proyectos y propuestas."
+      />
 
       <SignUpForm />
 
       <p className="auth-switch">
-        Already registered? <Link to="/login">Sign in</Link>.
+        ¿Ya tienes cuenta? <Link to="/login">Iniciar sesión</Link>.
       </p>
     </section>
   );

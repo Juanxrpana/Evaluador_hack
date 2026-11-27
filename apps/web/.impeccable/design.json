@@ -1,0 +1,356 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-27T20:00:00.000Z",
+  "title": "Design System: Evaluador de Propuestas",
+  "extensions": {
+    "colorMeta": {
+      "calibration-lime": {
+        "role": "primary",
+        "displayName": "Calibration Lime",
+        "canonical": "#d7f36b",
+        "tonalRamp": [
+          "#2a3a10",
+          "#465c1c",
+          "#637f28",
+          "#81a236",
+          "#a0c247",
+          "#bede55",
+          "#d7f36b",
+          "#eefbc0"
+        ]
+      },
+      "bench-graphite": {
+        "role": "neutral",
+        "displayName": "Bench Graphite",
+        "canonical": "#080a09",
+        "tonalRamp": [
+          "#050706",
+          "#080a09",
+          "#101412",
+          "#171c19",
+          "#232a26",
+          "#35403a",
+          "#5b6860",
+          "#93a098"
+        ]
+      },
+      "panel-graphite": {
+        "role": "neutral",
+        "displayName": "Panel Graphite",
+        "canonical": "#101412",
+        "tonalRamp": [
+          "#080a09",
+          "#0c0f0d",
+          "#101412",
+          "#151a17",
+          "#1b211d",
+          "#232a26",
+          "#35403a",
+          "#5b6860"
+        ]
+      },
+      "line-graphite": {
+        "role": "neutral",
+        "displayName": "Line Graphite",
+        "canonical": "#232a26",
+        "tonalRamp": [
+          "#101412",
+          "#171c19",
+          "#1b211d",
+          "#1f2621",
+          "#232a26",
+          "#2c3530",
+          "#35403a",
+          "#4b5a51"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Instrument Ink",
+        "canonical": "#edf2ee",
+        "tonalRamp": [
+          "#5b6860",
+          "#6b776f",
+          "#8e9a92",
+          "#a9b3ab",
+          "#c3cdc6",
+          "#d8dfd8",
+          "#edf2ee",
+          "#f8faf7"
+        ]
+      },
+      "muted-dark": {
+        "role": "neutral",
+        "displayName": "Instrument Muted",
+        "canonical": "#93a098",
+        "tonalRamp": [
+          "#35403a",
+          "#4b5a51",
+          "#5b6860",
+          "#6b776f",
+          "#7c8880",
+          "#85928a",
+          "#93a098",
+          "#b7c1b9"
+        ]
+      },
+      "revision-amber": {
+        "role": "accent",
+        "displayName": "Revision Amber",
+        "canonical": "#e8b45e",
+        "tonalRamp": [
+          "#3a2a0f",
+          "#5e4318",
+          "#845f22",
+          "#a97c2c",
+          "#c99a3f",
+          "#dcaa52",
+          "#e8b45e",
+          "#f4d79e"
+        ]
+      },
+      "compliance-green": {
+        "role": "accent",
+        "displayName": "Compliance Green",
+        "canonical": "#8fd8a9",
+        "tonalRamp": [
+          "#12301e",
+          "#1d4a2e",
+          "#2c6a42",
+          "#3f8b57",
+          "#5aaa72",
+          "#79c48e",
+          "#8fd8a9",
+          "#c6f0d3"
+        ]
+      },
+      "discard-red": {
+        "role": "accent",
+        "displayName": "Discard Red",
+        "canonical": "#ef918b",
+        "tonalRamp": [
+          "#3d1512",
+          "#5f221d",
+          "#853029",
+          "#a83f36",
+          "#c95a50",
+          "#dd7168",
+          "#ef918b",
+          "#f9c7c3"
+        ]
+      },
+      "info-blue": {
+        "role": "accent",
+        "displayName": "Reference Blue",
+        "canonical": "#9fbcf0",
+        "tonalRamp": [
+          "#151f33",
+          "#22314f",
+          "#31456f",
+          "#42608f",
+          "#5e7fae",
+          "#7d9cc9",
+          "#9fbcf0",
+          "#d0def8"
+        ]
+      },
+      "room-paper": {
+        "role": "neutral",
+        "displayName": "Room Paper",
+        "canonical": "#f2f4ef",
+        "tonalRamp": [
+          "#0f1511",
+          "#2a342d",
+          "#5b6860",
+          "#7c8880",
+          "#a9b3ab",
+          "#ccd4cd",
+          "#e3e8e1",
+          "#f2f4ef"
+        ]
+      },
+      "ink-paper": {
+        "role": "neutral",
+        "displayName": "Paper Ink",
+        "canonical": "#0f1511",
+        "tonalRamp": [
+          "#0f1511",
+          "#1a231d",
+          "#2a342d",
+          "#3c483f",
+          "#5b6860",
+          "#8a958d",
+          "#c3cbc4",
+          "#f2f4ef"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles only; max two lines at mobile width."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Panel titles and document section headings."
+      },
+      "body": { "displayName": "Body", "purpose": "Ledes and prose, capped at 68ch." },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Readout labels, table headers, and status metadata."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Money, positions, deltas, and dates with tabular numerals."
+      }
+    },
+    "shadows": [
+      {
+        "name": "primary-hover",
+        "value": "0 8px 24px color-mix(in srgb, #d7f36b 24%, transparent)",
+        "purpose": "Soft accent glow under a hovered primary button."
+      },
+      {
+        "name": "panel-none",
+        "value": "none",
+        "purpose": "Panels are flat at rest; depth comes from tonal shift and borders."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.2, 0.7, 0.2, 1)",
+        "purpose": "All button, nav, segment, and row transitions."
+      },
+      {
+        "name": "rise",
+        "value": "entrada 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both",
+        "purpose": "One page-level entrance; disabled under prefers-reduced-motion."
+      },
+      {
+        "name": "pulse",
+        "value": "pulso 1.1s ease-in-out infinite",
+        "purpose": "Dot of a processing status badge."
+      }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "980px" },
+      { "name": "sm", "value": "760px" },
+      { "name": "xs", "value": "420px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single lime action voice; one per action group.",
+      "html": "<button class=\"ds-btn-primary\">Cargar propuestas</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 9px 15px; border: 1px solid var(--accent, #d7f36b); border-radius: 9px; background: var(--accent, #d7f36b); color: var(--accent-ink, #0c1105); font: 650 13.6px/1.2 Archivo, ui-sans-serif, sans-serif; cursor: pointer; transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 180ms cubic-bezier(0.2, 0.7, 0.2, 1); } .ds-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px color-mix(in srgb, #d7f36b 24%, transparent); } .ds-btn-primary:active { transform: translateY(0) scale(0.985); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #d7f36b); outline-offset: 3px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action with a line border; fills the panel tone on hover.",
+      "html": "<button class=\"ds-btn-ghost\">Ver ranking</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 9px 15px; border: 1px solid var(--line-strong, #35403a); border-radius: 9px; background: transparent; color: var(--ink-soft, #c6d0c9); font: 650 13.6px/1.2 Archivo, ui-sans-serif, sans-serif; cursor: pointer; transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1), background 180ms cubic-bezier(0.2, 0.7, 0.2, 1), border-color 180ms; } .ds-btn-ghost:hover { background: var(--surface, #101412); border-color: var(--ink-soft, #c6d0c9); color: var(--ink, #edf2ee); transform: translateY(-1px); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--accent, #d7f36b); outline-offset: 3px; }"
+    },
+    {
+      "name": "Ranking Segment",
+      "kind": "chip",
+      "refersTo": "segment-active",
+      "description": "Two-option control for automatic versus adjusted ranking.",
+      "html": "<div class=\"ds-seg\"><button class=\"ds-seg-btn ds-seg-on\" aria-pressed=\"true\">Automático</button><button class=\"ds-seg-btn\" aria-pressed=\"false\">Ajustado</button></div>",
+      "css": ".ds-seg { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line, #232a26); border-radius: 9px; background: var(--surface, #101412); } .ds-seg-btn { padding: 6px 13px; border: 0; border-radius: 7px; background: transparent; color: var(--muted, #93a098); font: 650 12.8px/1.2 Archivo, ui-sans-serif, sans-serif; cursor: pointer; transition: background 180ms, color 180ms; } .ds-seg-btn:hover { color: var(--ink, #edf2ee); } .ds-seg-on { background: var(--accent, #d7f36b); color: var(--accent-ink, #0c1105); }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "description": "Text plus dot state label; the text is the message, the colour is reinforcement.",
+      "html": "<span class=\"ds-badge ds-badge-warn\"><span class=\"ds-dot\"></span>Requiere revisión</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3.5px 10px 3.5px 8px; border: 1px solid color-mix(in srgb, #e8b45e 24%, transparent); border-radius: 999px; background: color-mix(in srgb, #e8b45e 10%, transparent); color: #e8b45e; font: 600 11.5px/1.2 Archivo, ui-sans-serif, sans-serif; white-space: nowrap; } .ds-dot { width: 6.7px; height: 6.7px; border-radius: 50%; background: currentColor; }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat bordered surface for a work area; no shadow at rest.",
+      "html": "<section class=\"ds-panel\"><h2 class=\"ds-panel-title\">Costo total estimado</h2><p class=\"ds-panel-body\">Bs 172.800,00</p></section>",
+      "css": ".ds-panel { padding: 18px 20px; border: 1px solid var(--line, #232a26); border-radius: 12px; background: var(--surface, #101412); color: var(--ink, #edf2ee); } .ds-panel-title { margin: 0 0 12px; font: 700 15.2px/1.3 Archivo, ui-sans-serif, sans-serif; letter-spacing: -0.01em; } .ds-panel-body { margin: 0; font: 400 14px/1.6 Archivo, ui-sans-serif, sans-serif; color: var(--muted, #93a098); }"
+    },
+    {
+      "name": "Note Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Review note input; dark well with a quiet focus ring.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-label\">Nota de revisión</span><textarea class=\"ds-input\" rows=\"3\" placeholder=\"Explica tu decisión en una línea.\"></textarea></label>",
+      "css": ".ds-field { display: grid; gap: 6px; } .ds-label { color: var(--muted, #93a098); font: 600 12.3px/1.4 Archivo, ui-sans-serif, sans-serif; } .ds-input { width: 100%; padding: 11px 13px; border: 1px solid var(--line-strong, #35403a); border-radius: 8px; background: var(--bg-2, #0c0f0d); color: var(--ink, #edf2ee); font: 400 14px/1.5 Archivo, ui-sans-serif, sans-serif; resize: vertical; } .ds-input:focus { border-color: var(--accent, #d7f36b); outline: 2px solid color-mix(in srgb, #d7f36b 35%, transparent); outline-offset: 1px; }"
+    },
+    {
+      "name": "Primary Navigation",
+      "kind": "nav",
+      "description": "Quiet top navigation with a lime underline on the active item.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-link ds-nav-on\" href=\"#\">Proyecto</a><a class=\"ds-nav-link\" href=\"#\">Carga</a><a class=\"ds-nav-link\" href=\"#\">Ranking</a></nav>",
+      "css": ".ds-nav { display: flex; gap: 2px; align-items: center; } .ds-nav-link { position: relative; padding: 8px 13px; border-radius: 8px; color: var(--muted, #93a098); font: 600 13.6px/1.2 Archivo, ui-sans-serif, sans-serif; text-decoration: none; transition: background 180ms, color 180ms; } .ds-nav-link:hover { background: var(--surface, #101412); color: var(--ink, #edf2ee); } .ds-nav-on { background: var(--surface-2, #151a17); color: var(--ink, #edf2ee); } .ds-nav-on::after { content: ''; position: absolute; left: 13px; right: 13px; bottom: 2px; height: 1px; background: var(--accent, #d7f36b); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El acta de medición",
+    "overview": "The interface behaves like a laboratory record that happens to be interactive: a dark instrument panel for reading results, a paper-light mode for printing and daylight review, and a strict separation between what the system calculated and what a person decided. Numbers are the loudest element on the page; colour is a label, never the message. The system is deliberately quiet. Surfaces are flat and border-led, the grid is structural rather than decorative, and the only saturated gesture is a calibration-lime action. That restraint is what makes the ranking, the review and the dictamen feel like records instead of a dashboard skin.",
+    "keyCharacteristics": [
+      "Dark graphite ground with a single lime action voice; light mode is a paper counterpart, not an afterthought.",
+      "Tabular numerals, explicit units, and absolute dates; money always reads Bs 172.800,00.",
+      "Status is a text badge with a dot; the same information survives without colour.",
+      "Rectangular panels, hairline rules, 8–12px corners; no shadowed card stack.",
+      "One authored motion: a short rise for page content and a 180ms lift on controls."
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "Lime appears only on the primary action, the selected segment, the focus ring, and the active nav underline. It should not exceed roughly 10% of any screen; its rarity is the signal.",
+        "section": "colors"
+      },
+      {
+        "name": "The Readout Rule",
+        "body": "Every number carries its unit and its moment. Bs 172.800,00 and 27 nov 2026, 14:31 are complete; 172800 and hoy are not.",
+        "section": "colors"
+      },
+      {
+        "name": "The Text-Not-Colour Rule",
+        "body": "A state is always written (Requiere revisión, Fuera del ranking); colour only reinforces it. A user who cannot see the hue must still get the answer.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Any figure that sits in a column, changes after a review, or is compared with another figure uses tabular numerals.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Eyebrow Rule",
+        "body": "Demo surfaces do not use a kicker above the heading; the heading carries its own weight. The legacy authentication routes keep their starter eyebrow until they are retired.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "A panel at rest has no shadow. Hover may lift a control by 1px; nothing floats above the page.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do show the count of excluded proposals beside the ranking, with a link to the reason.",
+      "Do keep money, dates, and rates in explicit Spanish formats.",
+      "Do use the lime voice once per screen; let the readouts carry the hierarchy.",
+      "Do keep the dark theme as the default and preserve the light theme as a full peer.",
+      "Do use text plus colour for every state, and keep touch targets at least 44px."
+    ],
+    "donts": [
+      "Don't use a decorative grid-line background; the layout grid is structure, not wallpaper.",
+      "Don't put an eyebrow above a demo page heading.",
+      "Don't use gradient text, glass, or a side accent stripe on a panel.",
+      "Don't show the model's confidence as a percentage or let it justify a discard.",
+      "Don't call the ranking definitivo, the winner ganadora, or the total TCO.",
+      "Don't use colour alone to distinguish a business rule from a technical failure."
+    ]
+  }
+}

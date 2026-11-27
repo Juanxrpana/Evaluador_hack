@@ -1,5 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
+import { PageHead, Panel } from '../../components/ui';
+import { fecha } from '../../lib/format';
 import { orpc } from '../../lib/orpc';
 
 export const Route = createFileRoute('/_authed/users')({
@@ -11,25 +13,32 @@ function UsersPage() {
   const { data: users } = useSuspenseQuery(orpc.users.list.queryOptions());
 
   return (
-    <section className="stack">
-      <p className="eyebrow">Authenticated endpoint</p>
-      <h1>Users</h1>
-      <p className="lede">
-        This list is served by a protected oRPC procedure. The API resolves the Better Auth session,
-        rejects anonymous callers with 401, and attaches the actor to audit records.
-      </p>
+    <div className="stack">
+      <PageHead
+        title="Usuarios"
+        lede="Cuentas registradas en el sistema. Cada sesión queda asociada a las acciones que registra."
+      />
 
-      <ul className="user-list">
-        {users.map((user) => (
-          <li key={user.id}>
-            <div>
-              <strong>{user.name}</strong>
-              <span>{user.email}</span>
-            </div>
-            <time dateTime={user.createdAt}>{new Date(user.createdAt).toLocaleString()}</time>
-          </li>
-        ))}
-      </ul>
-    </section>
+      <Panel
+        title="Cuentas"
+        aside={
+          <span className="panel__meta">
+            {users.length} {users.length === 1 ? 'registrada' : 'registradas'}
+          </span>
+        }
+      >
+        <ul className="user-list">
+          {users.map((user) => (
+            <li key={user.id}>
+              <div>
+                <strong>{user.name}</strong>
+                <span>{user.email}</span>
+              </div>
+              <time dateTime={user.createdAt}>{fecha(user.createdAt)}</time>
+            </li>
+          ))}
+        </ul>
+      </Panel>
+    </div>
   );
 }

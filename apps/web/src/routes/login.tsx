@@ -1,4 +1,5 @@
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { PageHead } from '../components/ui';
 import { SignInForm } from '../components/AuthForm';
 import { sessionQueryOptions } from '../lib/session';
 
@@ -7,7 +8,7 @@ export const Route = createFileRoute('/login')({
     const session = await context.queryClient.fetchQuery(sessionQueryOptions);
 
     if (session) {
-      throw redirect({ to: '/users' });
+      throw redirect({ to: '/proyectos' });
     }
   },
   component: LoginPage,
@@ -16,17 +17,15 @@ export const Route = createFileRoute('/login')({
 function LoginPage() {
   return (
     <section className="stack auth-page">
-      <p className="eyebrow">Welcome back</p>
-      <h1>Sign in</h1>
-      <p className="lede">
-        Better Auth manages the password hash, session cookie, CSRF checks, and session rotation.
-        This app only owns the form and the database tables.
-      </p>
+      <PageHead
+        title="Iniciar sesión"
+        lede="Accede para gestionar proyectos, proveedores y propuestas del laboratorio."
+      />
 
       <SignInForm />
 
       <p className="auth-switch">
-        No account? <Link to="/signup">Create one</Link>.
+        ¿No tienes cuenta? <Link to="/signup">Crear una</Link>.
       </p>
     </section>
   );
