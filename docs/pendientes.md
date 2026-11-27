@@ -2,7 +2,7 @@
 
 > Fuente de verdad: `IA_RETO_GRUPAL_PROPUESTA_DE_SERVICIOS_enunciado_.pdf`
 > (Hackatón Venezuela INNOVA 2026 — Reto grupal: Agente Evaluador de Propuestas de Servicios).
-> Estado evaluado al commit `ce06d85` (2026-11-27).
+> Estado evaluado al commit `ac19fd0` (2026-11-27, tras el rediseño web `b5edb0e`).
 > Regla de oro del enunciado (sección 3): si algo difiere, **manda la sección 3**.
 > Calificación final = Plataforma (0–75) + 1,25 × Evaluación automática (0–20).
 
@@ -32,7 +32,11 @@ Todo lo demás alimenta la plataforma (75 pts).
 - Historial de costos por proveedor entre proyectos (montos, recargos totales, estado, resumen min/max/promedio).
 - Chat RAG por proyecto (`/api/chat/ask`) con fuentes, acotado al conocimiento del proyecto.
 - Auditoría durable (`audit_events`: quién, qué, cuándo) y logs estructurados con request/trace IDs.
-- Migraciones reversibles + tests (28 pasando) y stack Compose/Podman reproducible.
+- **Cifrado en reposo AES-256-GCM** de `documento.contenido` en la capa de escritura
+  (`documento.crypto.ts`); clave `DOCUMENTO_ENCRYPTION_KEY` por entorno, fail-fast al arrancar.
+- **Sistema de diseño adoptado en toda la web** (`b5edb0e`: `SystemShell`, DESIGN.md, tema y
+  tipografía propios) — mejora el punto "claridad de la interfaz" del baremo de Plataforma.
+- Migraciones reversibles + tests (35 pasando) y stack Compose/Podman reproducible.
 
 ## A. Ingesta documental multimodal
 
@@ -76,7 +80,7 @@ Todo lo demás alimenta la plataforma (75 pts).
 
 ## C. Investigación y contraste de precios en internet
 
-- [ ] **C.1 Búsqueda web de precios de mercado** ❌
+- [ ] **C.1 Búsqueda web de precios de mercado** ❌ (en curso: un integrante del equipo lo está tomando)
       Diseño listo e infra probada: SearXNG local con JSON (contenedor en el puerto 8888,
       config en `docker/searxng/settings.yml`) y tasa BCV vía `ve.dolarapi.com` (verificado).
       Falta: módulo `mercado` (puerto `WebSearchClient` + adaptador SearXNG), 1 búsqueda por
@@ -88,6 +92,9 @@ Todo lo demás alimenta la plataforma (75 pts).
       Falta: devolver `fuentes[]` al motor de evaluación y pintarlas en el informe (D.4).
 
 ## D. UI e informe de factibilidad financiera
+
+> Nota de avance (`b5edb0e`): la web ya tiene sistema de diseño completo (claridad de interfaz).
+> Los ítems D.1–D.4 siguen abiertos porque son **funcionalidad**, no estilo.
 
 - [ ] **D.1 Campo de carga del Proyecto** 🟡
       Hoy el proyecto tiene `nombre` + `descripcion`; no hay documento base de requerimientos
@@ -156,9 +163,13 @@ Todo lo demás alimenta la plataforma (75 pts).
 
 ## F. Seguridad de la información
 
-- [ ] **F.1 Cifrado en tránsito (TLS 1.2/1.3)** 🟡
-      El stack local es HTTP. Para la demo/despliegue: proxy con TLS (nginx/Caddy) delante de
-      web+api, o exponer solo vía HTTPS. Documentar la topología (`TRUST_PROXY`).
+- [ ] **F.1 Cifrado en tránsito (TLS 1.2/1.3)** 🟡 (diseño listo, falta implementar)
+      El stack local es HTTP. Plan acordado: servicio **Caddy** en `compose.yaml` que termina TLS
+      en `https://localhost:8443` (`tls internal`, certificado local sin internet), redirección
+      http→https, y **SSL de Postgres** (`ssl=on` + `sslmode=require`) para la conexión API↔BD.
+      Ajustes que trae: `PUBLIC_ORIGIN` pasa a https, `TRUST_PROXY` de `1` a **`2`** (dos saltos:
+      Caddy + nginx; si no, los rate limits cuentan a todos con la misma IP), y cookies `Secure`
+      automáticas. Documentar cómo aceptar/importar el certificado local en el navegador.
 - [x] **F.2 Cifrado en reposo (AES-256)** ✅
       `documento.contenido` se cifra con AES-256-GCM dentro del adaptador de escritura
       (`documento.crypto.ts`): la base solo ve ciphertext, `tamano_bytes` conserva el tamaño
@@ -203,7 +214,7 @@ Todo lo demás alimenta la plataforma (75 pts).
 6. **A.4 + A.2** — XLSX y PDFs escaneados (formatos obligatorios del lote).
 7. **E.2.b + E.1.b** — permisos reales por rol y etapas nombradas.
 8. **E.5.b** — export PDF/CSV del informe.
-9. **F** — TLS de demo, cifrado en reposo, anti prompt-injection (F.3/B.6 van de la mano de C.1).
+9. **F.1 + B.6** — TLS de demo (diseño listo) y anti prompt-injection (cifrado en reposo ✅).
 
 ## Bloqueos operativos (no son código, pero frenan la demo)
 
@@ -211,7 +222,7 @@ Todo lo demás alimenta la plataforma (75 pts).
   extracción de montos/recargos** (`LlmMontosExtractor`). Sustituir el marcador en
   `apps/api/.env` y reiniciar `pnpm dev`.
 - Descarga inicial del modelo bge-m3 (primer uso de documentos/chat) a `apps/api/.models`.
-- SearXNG local: commitear `docker/searxng/settings.yml` y agregarlo como servicio en
-  `compose.yaml` para que la demo sea reproducible.
+- SearXNG local: la config ya está commiteada (`docker/searxng/settings.yml`); falta agregarlo
+  como servicio en `compose.yaml` para que la demo sea 100% reproducible.
 - El campo `repositorio` del `salida.json` debe apuntar al repo oficial del hackatón (GitLab),
   no al espejo de GitHub.
