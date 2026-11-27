@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as AuthedCorreosRouteImport } from './routes/_authed/correos'
 import { Route as AuthedProveedoresRouteImport } from './routes/_authed/proveedores'
 import { Route as AuthedProyectosRouteImport } from './routes/_authed/proyectos'
 import { Route as AuthedUsersRouteImport } from './routes/_authed/users'
@@ -39,6 +40,11 @@ const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthedCorreosRoute = AuthedCorreosRouteImport.update({
+  id: '/correos',
+  path: '/correos',
+  getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedProveedoresRoute = AuthedProveedoresRouteImport.update({
   id: '/proveedores',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/correos': typeof AuthedCorreosRoute
   '/proveedores': typeof AuthedProveedoresRoute
   '/proyectos': typeof AuthedProyectosRouteWithChildren
   '/users': typeof AuthedUsersRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/correos': typeof AuthedCorreosRoute
   '/proveedores': typeof AuthedProveedoresRoute
   '/users': typeof AuthedUsersRoute
   '/proyectos': typeof AuthedProyectosIndexRoute
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/_authed/correos': typeof AuthedCorreosRoute
   '/_authed/proveedores': typeof AuthedProveedoresRoute
   '/_authed/proyectos': typeof AuthedProyectosRouteWithChildren
   '/_authed/users': typeof AuthedUsersRoute
@@ -119,6 +128,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/correos'
     | '/proveedores'
     | '/proyectos'
     | '/users'
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/correos'
     | '/proveedores'
     | '/users'
     | '/proyectos'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/_authed'
     | '/login'
     | '/signup'
+    | '/_authed/correos'
     | '/_authed/proveedores'
     | '/_authed/proyectos'
     | '/_authed/users'
@@ -187,6 +199,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authed/correos': {
+      id: '/_authed/correos'
+      path: '/correos'
+      fullPath: '/correos'
+      preLoaderRoute: typeof AuthedCorreosRouteImport
+      parentRoute: typeof AuthedRoute
     }
     '/_authed/proveedores': {
       id: '/_authed/proveedores'
@@ -268,12 +287,14 @@ const AuthedProyectosRouteWithChildren = AuthedProyectosRoute._addFileChildren(
 )
 
 interface AuthedRouteChildren {
+  AuthedCorreosRoute: typeof AuthedCorreosRoute
   AuthedProveedoresRoute: typeof AuthedProveedoresRoute
   AuthedProyectosRoute: typeof AuthedProyectosRouteWithChildren
   AuthedUsersRoute: typeof AuthedUsersRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedCorreosRoute: AuthedCorreosRoute,
   AuthedProveedoresRoute: AuthedProveedoresRoute,
   AuthedProyectosRoute: AuthedProyectosRouteWithChildren,
   AuthedUsersRoute: AuthedUsersRoute,

@@ -1630,6 +1630,148 @@ a.readout__item:hover {
   font-size: 0.86rem;
 }
 
+/* Cuerpo de un correo en la vista de detalle de /correos. */
+.cuerpo-correo {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 22rem;
+  overflow-y: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+/* Modal de detalle de correo (/correos). */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgb(0 0 0 / 60%);
+  backdrop-filter: blur(4px);
+  animation: modal-fade 0.15s ease-out;
+}
+
+.modal {
+  width: min(680px, 100%);
+  max-height: min(85vh, 860px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: modal-subir 0.18s ease-out;
+}
+
+.modal-cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-titulo {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.modal-cerrar {
+  flex: none;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: var(--radius-sm);
+  width: 2rem;
+  height: 2rem;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-cerrar:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.modal-cuerpo {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+}
+
+.modal-meta {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.modal-meta div {
+  display: flex;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.modal-meta dt {
+  flex: 0 0 4.2rem;
+  color: var(--faint);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-top: 0.15rem;
+}
+
+.modal-meta dd {
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.adjunto-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  background: transparent;
+  font-family: inherit;
+}
+
+.adjunto-chip:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.adjunto-chip:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-subir {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
 button[type='submit'] {
   min-height: 2.5rem;
   justify-self: start;

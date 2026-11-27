@@ -8,6 +8,7 @@ import type { Auth } from './auth/auth.ts';
 import { env } from './config/env.ts';
 import type { ChatService } from './modules/chat/chat.service.ts';
 import type { ConocimientoListService } from './modules/documentos/conocimiento.list.ts';
+import type { CorreoService } from './modules/correos/correo.service.ts';
 import type { DocumentoService } from './modules/documentos/documento.service.ts';
 import type { EstatusService } from './modules/estatus/estatus.service.ts';
 import type { NotaService } from './modules/notas/nota.service.ts';
@@ -39,6 +40,7 @@ export interface AppDependencies {
   recargos: RecargoReader;
   conocimiento: ConocimientoListService;
   tasa: TasaBcvService;
+  correos: CorreoService;
 }
 
 export function createApp(dependencies: AppDependencies) {

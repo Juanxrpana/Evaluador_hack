@@ -4,6 +4,12 @@ import type { Auth } from '../auth/auth.ts';
 import { LlmError } from '../modules/ai/llm.client.ts';
 import type { ChatService } from '../modules/chat/chat.service.ts';
 import { ProyectoNoEncontradoChatError } from '../modules/chat/chat.service.ts';
+import type { CorreoService } from '../modules/correos/correo.service.ts';
+import {
+  AdjuntoDemasiadoGrandeError,
+  CorreoNoDisponibleError,
+  CorreoNoEncontradoError,
+} from '../modules/correos/correo.service.ts';
 import {
   DocumentoDemasiadoGrandeError,
   DocumentoVacioError,
@@ -48,6 +54,7 @@ export interface RouterDependencies {
   recargos: RecargoReader;
   conocimiento: ConocimientoListService;
   tasa: TasaBcvService;
+  correos: CorreoService;
 }
 
 /** Expected domain failures become typed 4xx responses; nothing else escapes. */
@@ -62,7 +69,8 @@ function mapDomainError(error: unknown): never {
     error instanceof ProyectoNoEncontradoChatError ||
     error instanceof DocumentoNoEncontradoError ||
     error instanceof NotaNoEncontradaError ||
-    error instanceof EstatusNoEncontradoError
+    error instanceof EstatusNoEncontradoError ||
+    error instanceof CorreoNoEncontradoError
   ) {
     throw new ORPCError('NOT_FOUND', { message: error.message });
   }
@@ -84,7 +92,8 @@ function mapDomainError(error: unknown): never {
     error instanceof DocumentoVacioError ||
     error instanceof DocumentoDemasiadoGrandeError ||
     error instanceof ContenidoIlegibleError ||
-    error instanceof ExtractorFallidoError
+    error instanceof ExtractorFallidoError ||
+    error instanceof AdjuntoDemasiadoGrandeError
   ) {
     throw new ORPCError('UNPROCESSABLE_CONTENT', { message: error.message });
   }
@@ -103,6 +112,10 @@ function mapDomainError(error: unknown): never {
 
   if (error instanceof TasaNoDisponibleError) {
     throw new ORPCError('SERVICE_UNAVAILABLE', { message: error.message });
+  }
+
+  if (error instanceof CorreoNoDisponibleError) {
+    throw new ORPCError('INTERNAL', { message: error.message });
   }
 
   // Unknown failures keep the safe message but never lose their cause.
@@ -126,6 +139,7 @@ export function createRouter({
   recargos,
   conocimiento,
   tasa,
+  correos,
 }: RouterDependencies) {
   const os = implement(contract).$context<ApiContext>();
 
@@ -273,6 +287,18 @@ export function createRouter({
       ask: os.chat.ask
         .use(authenticated)
         .handler(({ input }) => chat.preguntar(input).catch(mapDomainError)),
+    },
+
+    correos: {
+      list: os.correos.list
+        .use(authenticated)
+        .handler(({ input }) => correos.listar(input).catch(mapDomainError)),
+      get: os.correos.get
+        .use(authenticated)
+        .handler(({ input }) => correos.obtenerDetalle(input).catch(mapDomainError)),
+      adjunto: os.correos.adjunto
+        .use(authenticated)
+        .handler(({ input }) => correos.descargarAdjunto(input).catch(mapDomainError)),
     },
   });
 }

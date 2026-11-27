@@ -9,6 +9,7 @@ import { MarkIcon, MoonIcon, SunIcon } from './Icons';
 const NAV = [
   { to: '/proyectos', label: 'Proyectos' },
   { to: '/proveedores', label: 'Proveedores' },
+  { to: '/correos', label: 'Correos' },
   { to: '/users', label: 'Usuarios' },
 ] as const;
 

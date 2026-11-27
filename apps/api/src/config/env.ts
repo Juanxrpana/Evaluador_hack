@@ -69,6 +69,14 @@ const envSchema = z.object({
       (value) => Buffer.from(value, 'base64').byteLength === 32,
       'DOCUMENTO_ENCRYPTION_KEY must decode to exactly 32 bytes',
     ),
+  // IMAP (correo scanning). Leave IMAP_HOST empty to disable the module;
+  // the password is an application password, never the account primary one.
+  IMAP_HOST: z.string().default(''),
+  IMAP_PORT: z.coerce.number().int().positive().default(993),
+  IMAP_TLS: z.stringbool().default(true),
+  IMAP_USER: z.string().default(''),
+  IMAP_PASSWORD: z.string().default(''),
+  IMAP_CORREOS_LIMITE: z.coerce.number().int().positive().default(50),
 });
 
 export const env = envSchema.parse(process.env);

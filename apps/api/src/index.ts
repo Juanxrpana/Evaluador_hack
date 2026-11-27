@@ -10,6 +10,8 @@ import { LocalBgeM3EmbeddingClient } from './modules/ai/local-bge.embedding.clie
 import { OpenRouterLlmClient } from './modules/ai/openrouter-llm.client.ts';
 import { PostgresAuditWriter } from './modules/audit/postgres-audit.writer.ts';
 import { ChatService } from './modules/chat/chat.service.ts';
+import { CorreoService } from './modules/correos/correo.service.ts';
+import { ImapCorreoProvider } from './modules/correos/imap.correo.provider.ts';
 import type {
   DocumentoTransaction,
   DocumentoTransactionRunner,
@@ -191,6 +193,9 @@ const chat: ChatService = new ChatService(
   llm,
 );
 
+// Correo scanning: IMAP adapter chosen here; tests can inject a fake provider.
+const correos = new CorreoService(new ImapCorreoProvider());
+
 const notas = new NotaService(new PostgresNotaReader(db), runInNotaTransaction, propuestaReader);
 const estatus = new EstatusService(
   new PostgresEstatusReader(db),
@@ -219,6 +224,7 @@ const app = createApp({
   recargos,
   conocimiento,
   tasa,
+  correos,
 });
 const server = createServer(app);
 

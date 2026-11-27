@@ -20,8 +20,10 @@
     "openapi": "pnpm --filter @repo/contracts build && pnpm --filter @repo/api openapi:generate"
   },
   "devDependencies": {
+    "@electric-sql/pglite-socket": "^0.3.0",
     "oxfmt": "catalog:",
-    "oxlint": "catalog:"
+    "oxlint": "catalog:",
+    "puppeteer-core": "^25.19.0"
   },
   "devEngines": {
     "runtime": {
@@ -34,5 +36,8 @@
     "node": ">=26.0.0",
     "pnpm": ">=12.0.0"
   },
-  "packageManager": "pnpm@12.23.0"
+  "packageManager": "pnpm@12.23.0",
+  "dependencies": {
+    "@electric-sql/pglite-pgvector": "^0.1.0"
+  }
 }
