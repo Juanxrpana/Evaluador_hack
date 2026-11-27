@@ -50,6 +50,22 @@ function decimalCsv(valor: number | null): string {
   return valor === null ? '' : deCentavos(valor).replace('.', ',');
 }
 
+/** ISO 8601 with explicit offset (the enunciado's example uses -04:00). */
+function isoConZona(instante: Date): string {
+  const offsetMinutos = -instante.getTimezoneOffset();
+  const signo = offsetMinutos >= 0 ? '+' : '-';
+  const abs = Math.abs(offsetMinutos);
+  const horas = String(Math.floor(abs / 60)).padStart(2, '0');
+  const minutos = String(abs % 60).padStart(2, '0');
+  const local = new Date(instante.getTime() - offsetMinutos * 60_000);
+
+  return `${local.toISOString().slice(0, 19)}${signo}${horas}:${minutos}`;
+}
+
+function sinExtension(nombre: string): string {
+  return nombre.replace(/\.[^.]+$/, '');
+}
+
 function InformePage() {
   const { id } = Route.useParams();
   const [generadoEn] = useState(() => new Date().toISOString());
@@ -60,6 +76,18 @@ function InformePage() {
   );
   const proveedoresQuery = useQuery(orpc.proveedores.list.queryOptions());
   const tasaQuery = useQuery({ ...orpc.tasa.bcv.queryOptions(), retry: 0 });
+  const documentosQuery = useQuery(
+    orpc.documentos.list.queryOptions({ input: { proyectoId: id } }),
+  );
+  const evaluacionesQuery = useQuery(
+    orpc.evaluaciones.list.queryOptions({ input: { proyectoId: id } }),
+  );
+  const ultimaEvaluacion = (evaluacionesQuery.data ?? [])[0];
+  const evaluacionDetalleQuery = useQuery({
+    ...orpc.evaluaciones.get.queryOptions({ input: { id: ultimaEvaluacion?.id ?? '' } }),
+    enabled: Boolean(ultimaEvaluacion),
+    retry: 0,
+  });
 
   const propuestas = propuestasQuery.data ?? [];
   const proveedores = proveedoresQuery.data ?? [];
@@ -89,6 +117,7 @@ function InformePage() {
     propuestasQuery.isLoading ||
     proveedoresQuery.isLoading ||
     tasaQuery.isLoading ||
+    documentosQuery.isLoading ||
     recargosQueries.some((query) => query.isLoading) ||
     notasQueries.some((query) => query.isLoading) ||
     estatusQueries.some((query) => query.isLoading);
@@ -200,6 +229,96 @@ function InformePage() {
     URL.revokeObjectURL(url);
   };
 
+  const descargarSalidaJson = () => {
+    if (!proyectoQuery.data || filas.length === 0) return;
+
+    const documentos = documentosQuery.data ?? [];
+    const documentoDePropuesta = (propuestaId: string) =>
+      documentos.find(
+        (documento) => documento.propuestaId === propuestaId && documento.tipo === 'propuesta',
+      );
+
+    const archivoDePropuesta = (propuestaId: string): string | null => {
+      const documento = documentoDePropuesta(propuestaId);
+
+      return documento ? sinExtension(documento.nombre) : null;
+    };
+
+    // 3.b: ranking by FILE NAME without extension, in the engine's order;
+    // valid best-first, then discarded. Falls back to known total cost.
+    const rankingAgente = evaluacionDetalleQuery.data?.informe?.ranking ?? [];
+    const vistos = new Set<string>();
+    const ranking: string[] = [];
+
+    for (const fila of rankingAgente) {
+      const archivo = archivoDePropuesta(fila.propuestaId);
+
+      if (archivo && !vistos.has(archivo)) {
+        vistos.add(archivo);
+        ranking.push(archivo);
+      }
+    }
+
+    if (ranking.length === 0) {
+      ranking.push(
+        ...filas
+          .map((fila) => {
+            const montoCentavos = aCentavos(fila.propuesta.monto);
+            const recargosCentavos = fila.recargos.reduce(
+              (suma, recargo) => suma + (aCentavos(recargo.monto) ?? 0),
+              0,
+            );
+
+            return {
+              archivo:
+                archivoDePropuesta(fila.propuesta.id) ??
+                nombreProveedor(fila.propuesta, proveedores),
+              total:
+                montoCentavos === null
+                  ? Number.POSITIVE_INFINITY
+                  : montoCentavos + recargosCentavos,
+            };
+          })
+          .toSorted((a, b) => a.total - b.total)
+          .map((fila) => fila.archivo),
+      );
+    }
+
+    const procesados = (
+      documentos.some((documento) => documento.tipo === 'propuesta')
+        ? documentos.filter((documento) => documento.tipo === 'propuesta')
+        : filas.map((fila) => ({
+            nombre: nombreProveedor(fila.propuesta, proveedores),
+            createdAt: fila.propuesta.createdAt,
+          }))
+    ).map((documento) => ({
+      archivo: documento.nombre,
+      hora: isoConZona(new Date(documento.createdAt)),
+    }));
+
+    const ahora = new Date();
+    const salida = {
+      reto: 'propuesta_servicios',
+      repositorio:
+        import.meta.env.VITE_GIT_REPOSITORY ?? 'https://github.com/Juanxrpana/Evaluador_hack',
+      commit: import.meta.env.VITE_GIT_COMMIT ?? 'local',
+      inicio: isoConZona(ahora),
+      fin: isoConZona(ahora),
+      procesados,
+      ranking,
+    };
+
+    const blob = new Blob([`${JSON.stringify(salida, null, 2)}\n`], {
+      type: 'application/json;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = 'salida.json';
+    enlace.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (cargando) {
     return (
       <Vacio>
@@ -263,6 +382,14 @@ function InformePage() {
         <Link to="/proyectos/$id" params={{ id }} className="btn btn--ghost">
           Volver al proyecto
         </Link>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={descargarSalidaJson}
+          disabled={cargando || errorCarga}
+        >
+          Descargar salida.json
+        </button>
         <button
           type="button"
           className="btn btn--ghost"
