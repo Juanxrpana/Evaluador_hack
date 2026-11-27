@@ -1,5 +1,9 @@
 import type { Proyecto } from '@repo/contracts';
-import type { ProyectoReader, CreateProyectoInput } from './proyecto.reader.ts';
+import type {
+  ProyectoReader,
+  CreateProyectoInput,
+  UpdateProyectoInput,
+} from './proyecto.reader.ts';
 import type { ProyectoTransactionRunner } from './proyecto.transaction.ts';
 
 /**
@@ -50,6 +54,48 @@ export class ProyectoService {
     }
 
     return creado;
+  }
+
+  async actualizar(id: string, input: UpdateProyectoInput): Promise<Proyecto> {
+    await this.#runInTransaction(async ({ proyectos, audit }) => {
+      const actualizado = await proyectos.update(id, input);
+
+      if (!actualizado) {
+        throw new ProyectoNoEncontradoError(id);
+      }
+
+      await audit.record({
+        action: 'proyecto.update',
+        resource: 'proyecto',
+        resourceId: id,
+      });
+    });
+
+    const actualizado = await this.#reader.get(id);
+
+    if (!actualizado) {
+      throw new ProyectoNoEncontradoError(id);
+    }
+
+    return actualizado;
+  }
+
+  async eliminar(id: string): Promise<{ id: string }> {
+    return this.#runInTransaction(async ({ proyectos, audit }) => {
+      const eliminado = await proyectos.remove(id);
+
+      if (!eliminado) {
+        throw new ProyectoNoEncontradoError(id);
+      }
+
+      await audit.record({
+        action: 'proyecto.delete',
+        resource: 'proyecto',
+        resourceId: id,
+      });
+
+      return { id };
+    });
   }
 }
 

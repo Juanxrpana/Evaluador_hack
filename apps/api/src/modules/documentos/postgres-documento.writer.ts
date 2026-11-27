@@ -28,4 +28,14 @@ export class PostgresDocumentoWriter implements DocumentoWriter {
 
     return { id: row.id };
   }
+
+  async remove(id: string): Promise<boolean> {
+    const rows = await this.#trx
+      .deleteFrom('documento')
+      .where('id', '=', id)
+      .returning(['id'])
+      .execute();
+
+    return rows.length > 0;
+  }
 }

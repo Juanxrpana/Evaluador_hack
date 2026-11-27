@@ -10,3 +10,7 @@ export interface CreatePropuestaInput {
   proveedorId: string;
   monto?: string;
 }
+
+export interface UpdatePropuestaInput {
+  monto?: string | null | undefined;
+}

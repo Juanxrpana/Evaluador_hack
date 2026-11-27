@@ -9,3 +9,8 @@ export interface CreateProyectoInput {
   nombre: string;
   descripcion?: string;
 }
+
+export interface UpdateProyectoInput {
+  nombre?: string;
+  descripcion?: string | null | undefined;
+}

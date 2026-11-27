@@ -94,7 +94,13 @@ export class ChatService {
           `Propuestas registradas: ${historial.resumen.totalPropuestas}; promedio ${historial.resumen.montoPromedio ?? 'n/d'}; mínimo ${historial.resumen.montoMinimo ?? 'n/d'}; máximo ${historial.resumen.montoMaximo ?? 'n/d'}; último monto ${historial.resumen.ultimoMonto ?? 'n/d'}.`,
           ...historial.entradas.map(
             (entrada) =>
-              `- Proyecto "${entrada.proyectoNombre}" (${entrada.createdAt.slice(0, 10)}): monto ${entrada.monto ?? 'n/d'}, recargos ${entrada.recargosTotal}.`,
+              `- Proyecto "${entrada.proyectoNombre}" (${entrada.createdAt.slice(0, 10)}): monto ${entrada.monto ?? 'n/d'}, recargos aparte: ${
+                entrada.recargos.length > 0
+                  ? entrada.recargos
+                      .map((recargo) => `${recargo.concepto} ${recargo.monto}`)
+                      .join(', ')
+                  : entrada.recargosTotal
+              }.`,
           ),
         ].join('\n');
       }

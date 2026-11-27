@@ -1,9 +1,8 @@
 import type { Transaction } from 'kysely';
 import type { DB } from '../../db/schema.generated.ts';
-import type { CreateProyectoInput } from './proyecto.reader.ts';
+import type { CreateProyectoInput, UpdateProyectoInput } from './proyecto.reader.ts';
 import type { ProyectoWriter } from './proyecto.writer.ts';
 
-/** Write adapter: requires a transaction. Root connections are compile errors. */
 export class PostgresProyectoWriter implements ProyectoWriter {
   readonly #trx: Transaction<DB>;
 
@@ -20,5 +19,36 @@ export class PostgresProyectoWriter implements ProyectoWriter {
       })
       .returning(['id'])
       .executeTakeFirstOrThrow();
+  }
+
+  async update(id: string, input: UpdateProyectoInput): Promise<boolean> {
+    const patch: Record<string, unknown> = { updated_at: new Date() };
+
+    if (input.nombre !== undefined) {
+      patch.nombre = input.nombre;
+    }
+
+    if (input.descripcion !== undefined) {
+      patch.descripcion = input.descripcion;
+    }
+
+    const rows = await this.#trx
+      .updateTable('proyecto')
+      .set(patch)
+      .where('id', '=', id)
+      .returning(['id'])
+      .execute();
+
+    return rows.length > 0;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const rows = await this.#trx
+      .deleteFrom('proyecto')
+      .where('id', '=', id)
+      .returning(['id'])
+      .execute();
+
+    return rows.length > 0;
   }
 }

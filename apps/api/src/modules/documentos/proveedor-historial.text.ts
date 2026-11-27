@@ -29,8 +29,12 @@ export function buildProveedorHistorialText(historial: ProveedorHistorial): stri
 
     for (const entrada of historial.entradas) {
       const monto = entrada.monto ? `monto ${entrada.monto}` : 'sin monto';
+      const conceptos =
+        entrada.recargos.length > 0
+          ? `, recargos aparte: ${entrada.recargos.map((recargo) => `${recargo.concepto} ${recargo.monto}`).join(', ')}`
+          : `, recargos aparte: ${entrada.recargosTotal}`;
       lineas.push(
-        `- Proyecto "${entrada.proyectoNombre}" (${entrada.createdAt.slice(0, 10)}): ${monto}, recargos ${entrada.recargosTotal}${entrada.estado === null ? '' : `, estado ${entrada.estado}`}.`,
+        `- Proyecto "${entrada.proyectoNombre}" (${entrada.createdAt.slice(0, 10)}): ${monto}${conceptos}${entrada.estado === null ? '' : `, estado ${entrada.estado}`}.`,
       );
     }
   }

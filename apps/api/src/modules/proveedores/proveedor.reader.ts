@@ -10,3 +10,8 @@ export interface CreateProveedorInput {
   nombre: string;
   contacto?: string;
 }
+
+export interface UpdateProveedorInput {
+  nombre?: string;
+  contacto?: string | null | undefined;
+}

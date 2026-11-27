@@ -22,6 +22,13 @@ import { PropuestaNoEncontradaError } from '../modules/propuestas/propuesta.serv
 import type { PropuestaService } from '../modules/propuestas/propuesta.service.ts';
 import type { UserService } from '../modules/users/user.service.ts';
 import { getRequestLogger, setRequestActor } from '../observability/request-context.ts';
+import type { EstatusService } from '../modules/estatus/estatus.service.ts';
+import { EstatusNoEncontradoError } from '../modules/estatus/estatus.service.ts';
+import type { NotaService } from '../modules/notas/nota.service.ts';
+import { NotaNoEncontradaError } from '../modules/notas/nota.service.ts';
+import type { RecargoReader } from '../modules/recargos/recargo.reader.ts';
+import type { ConocimientoListService } from '../modules/documentos/conocimiento.list.ts';
+import { DocumentoNoEncontradoError } from '../modules/documentos/documento.service.ts';
 
 export interface ApiContext {
   session: Awaited<ReturnType<Auth['api']['getSession']>>;
@@ -34,6 +41,10 @@ export interface RouterDependencies {
   propuestas: PropuestaService;
   documentos: DocumentoService;
   chat: ChatService;
+  notas: NotaService;
+  estatus: EstatusService;
+  recargos: RecargoReader;
+  conocimiento: ConocimientoListService;
 }
 
 /** Expected domain failures become typed 4xx responses; nothing else escapes. */
@@ -45,9 +56,25 @@ function mapDomainError(error: unknown): never {
     error instanceof ProyectoNoExisteError ||
     error instanceof PropuestaNoExisteError ||
     error instanceof PropuestaOtroProyectoError ||
-    error instanceof ProyectoNoEncontradoChatError
+    error instanceof ProyectoNoEncontradoChatError ||
+    error instanceof DocumentoNoEncontradoError ||
+    error instanceof NotaNoEncontradaError ||
+    error instanceof EstatusNoEncontradoError
   ) {
     throw new ORPCError('NOT_FOUND', { message: error.message });
+  }
+
+  // A delete blocked by a surviving FK relation (e.g. proveedor with propuestas).
+  // RESTRICT violations surface as 23001; cascade/foreign-key ones as 23503.
+  const pgCode =
+    error && typeof error === 'object' && 'code' in error
+      ? (error as { code?: unknown }).code
+      : (error as { cause?: { code?: unknown } } | null)?.cause?.code;
+
+  if (pgCode === '23503' || pgCode === '23001') {
+    throw new ORPCError('CONFLICT', {
+      message: 'El registro tiene relaciones y no puede eliminarse todavía.',
+    });
   }
 
   if (
@@ -87,6 +114,10 @@ export function createRouter({
   propuestas,
   documentos,
   chat,
+  notas,
+  estatus,
+  recargos,
+  conocimiento,
 }: RouterDependencies) {
   const os = implement(contract).$context<ApiContext>();
 
@@ -112,28 +143,91 @@ export function createRouter({
 
     proyectos: {
       list: os.proyectos.list.use(authenticated).handler(() => proyectos.list()),
+      get: os.proyectos.get
+        .use(authenticated)
+        .handler(({ input }) => proyectos.get(input.id).catch(mapDomainError)),
       create: os.proyectos.create
         .use(authenticated)
         .handler(({ input }) => proyectos.create(input).catch(mapDomainError)),
+      update: os.proyectos.update
+        .use(authenticated)
+        .handler(({ input }) => proyectos.actualizar(input.id, input).catch(mapDomainError)),
+      delete: os.proyectos.delete
+        .use(authenticated)
+        .handler(({ input }) => proyectos.eliminar(input.id).catch(mapDomainError)),
     },
 
     proveedores: {
       list: os.proveedores.list.use(authenticated).handler(() => proveedores.list()),
+      get: os.proveedores.get
+        .use(authenticated)
+        .handler(({ input }) => proveedores.get(input.id).catch(mapDomainError)),
       create: os.proveedores.create
         .use(authenticated)
         .handler(({ input }) => proveedores.create(input).catch(mapDomainError)),
+      update: os.proveedores.update
+        .use(authenticated)
+        .handler(({ input }) => proveedores.actualizar(input.id, input).catch(mapDomainError)),
+      delete: os.proveedores.delete
+        .use(authenticated)
+        .handler(({ input }) => proveedores.eliminar(input.id).catch(mapDomainError)),
       historial: os.proveedores.historial
         .use(authenticated)
         .handler(({ input }) => proveedores.historial(input.id).catch(mapDomainError)),
     },
 
     propuestas: {
-      create: os.propuestas.create
-        .use(authenticated)
-        .handler(({ input }) => propuestas.create(input).catch(mapDomainError)),
       list: os.propuestas.list
         .use(authenticated)
         .handler(({ input }) => propuestas.listByProyecto(input.proyectoId).catch(mapDomainError)),
+      get: os.propuestas.get
+        .use(authenticated)
+        .handler(({ input }) => propuestas.get(input.id).catch(mapDomainError)),
+      create: os.propuestas.create
+        .use(authenticated)
+        .handler(({ input }) => propuestas.create(input).catch(mapDomainError)),
+      update: os.propuestas.update
+        .use(authenticated)
+        .handler(({ input }) => propuestas.actualizar(input.id, input).catch(mapDomainError)),
+      delete: os.propuestas.delete
+        .use(authenticated)
+        .handler(({ input }) => propuestas.eliminar(input.id).catch(mapDomainError)),
+    },
+
+    recargos: {
+      list: os.recargos.list
+        .use(authenticated)
+        .handler(({ input }) => recargos.listByPropuesta(input.propuestaId).catch(mapDomainError)),
+    },
+
+    notas: {
+      list: os.notas.list
+        .use(authenticated)
+        .handler(({ input }) => notas.listByPropuesta(input.propuestaId).catch(mapDomainError)),
+      create: os.notas.create
+        .use(authenticated)
+        .handler(({ input }) => notas.create(input).catch(mapDomainError)),
+      update: os.notas.update
+        .use(authenticated)
+        .handler(({ input }) => notas.actualizar(input.id, input).catch(mapDomainError)),
+      delete: os.notas.delete
+        .use(authenticated)
+        .handler(({ input }) => notas.eliminar(input.id).catch(mapDomainError)),
+    },
+
+    estatus: {
+      list: os.estatus.list
+        .use(authenticated)
+        .handler(({ input }) => estatus.list(input).catch(mapDomainError)),
+      create: os.estatus.create
+        .use(authenticated)
+        .handler(({ input }) => estatus.create(input).catch(mapDomainError)),
+      update: os.estatus.update
+        .use(authenticated)
+        .handler(({ input }) => estatus.actualizar(input.id, input).catch(mapDomainError)),
+      delete: os.estatus.delete
+        .use(authenticated)
+        .handler(({ input }) => estatus.eliminar(input.id).catch(mapDomainError)),
     },
 
     documentos: {
@@ -143,6 +237,17 @@ export function createRouter({
       list: os.documentos.list
         .use(authenticated)
         .handler(({ input }) => documentos.listByProyecto(input.proyectoId).catch(mapDomainError)),
+      delete: os.documentos.delete
+        .use(authenticated)
+        .handler(({ input }) => documentos.eliminar(input.id).catch(mapDomainError)),
+    },
+
+    conocimiento: {
+      list: os.conocimiento.list
+        .use(authenticated)
+        .handler(({ input }) =>
+          conocimiento.listByProyecto(input.proyectoId).catch(mapDomainError),
+        ),
     },
 
     chat: {

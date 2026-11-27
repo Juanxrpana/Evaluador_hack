@@ -10,6 +10,7 @@ import type { DocumentoTransactionRunner } from './documento.transaction.ts';
 import { chunkText } from './chunker.ts';
 import type { ExtractorContenido } from './extractor.port.ts';
 import { ContenidoIlegibleError } from './extractor.port.ts';
+import type { ExtractorMontos, MontosExtraidos } from './extraccion-montos.port.ts';
 import { buildProveedorHistorialText } from './proveedor-historial.text.ts';
 
 /**
@@ -30,6 +31,7 @@ export class DocumentoService {
   readonly #proveedores: ProveedorReader;
   readonly #extractor: ExtractorContenido;
   readonly #embeddings: EmbeddingClient;
+  readonly #extractorMontos: ExtractorMontos;
 
   constructor(
     reader: DocumentoReader,
@@ -39,6 +41,7 @@ export class DocumentoService {
     proveedores: ProveedorReader,
     extractor: ExtractorContenido,
     embeddings: EmbeddingClient,
+    extractorMontos: ExtractorMontos,
   ) {
     this.#reader = reader;
     this.#runInTransaction = runInTransaction;
@@ -47,6 +50,7 @@ export class DocumentoService {
     this.#proveedores = proveedores;
     this.#extractor = extractor;
     this.#embeddings = embeddings;
+    this.#extractorMontos = extractorMontos;
   }
 
   async listByProyecto(proyectoId: string): Promise<Documento[]> {
@@ -129,48 +133,70 @@ export class DocumentoService {
       }
     }
 
-    // 4) One transaction: documento + knowledge chunks + audit.
-    const resultado = await this.#runInTransaction(async ({ documentos, conocimiento, audit }) => {
-      const { id: documentoId } = await documentos.create({
-        proyectoId: input.proyectoId,
-        propuestaId: input.propuestaId ?? null,
-        proveedorId: input.proveedorId ?? null,
-        nombre: input.nombre,
-        mime: input.mime,
-        bytes,
-      });
+    // 4) When the document belongs to a propuesta, the LLM extracts the
+    // offered monto and the surcharges (recargos) BEFORE the transaction.
+    let extraccion: MontosExtraidos | null = null;
 
-      const chunksInsertados = await conocimiento.insertConEmbeddings({
-        proyectoId: input.proyectoId,
-        tipo: 'documento',
-        titulo: input.nombre,
-        documentoId,
-        chunks,
-        embeddings,
-      });
+    if (input.propuestaId) {
+      extraccion = await this.#extractorMontos.extraer(texto);
+    }
 
-      let historialInsertados = 0;
-      if (input.proveedorId && historialChunks.length > 0) {
-        await conocimiento.deleteProveedorHistorial(input.proyectoId, input.proveedorId);
-        historialInsertados = await conocimiento.insertConEmbeddings({
+    // 5) One transaction: documento + knowledge chunks + propuesta/recargos + audit.
+    const resultado = await this.#runInTransaction(
+      async ({ documentos, conocimiento, propuestas, recargos, audit }) => {
+        const { id: documentoId } = await documentos.create({
           proyectoId: input.proyectoId,
-          tipo: 'proveedor_historial',
-          titulo: historialTitulo,
-          documentoId: null,
-          chunks: historialChunks,
-          embeddings: historialEmbeddings,
-          metadata: { proveedorId: input.proveedorId },
+          propuestaId: input.propuestaId ?? null,
+          proveedorId: input.proveedorId ?? null,
+          nombre: input.nombre,
+          mime: input.mime,
+          bytes,
         });
-      }
 
-      await audit.record({
-        action: 'documento.upload',
-        resource: 'documento',
-        resourceId: documentoId,
-      });
+        const chunksInsertados = await conocimiento.insertConEmbeddings({
+          proyectoId: input.proyectoId,
+          tipo: 'documento',
+          titulo: input.nombre,
+          documentoId,
+          chunks,
+          embeddings,
+        });
 
-      return { documentoId, chunksInsertados, historialInsertados };
-    });
+        let historialInsertados = 0;
+        if (input.proveedorId && historialChunks.length > 0) {
+          await conocimiento.deleteProveedorHistorial(input.proyectoId, input.proveedorId);
+          historialInsertados = await conocimiento.insertConEmbeddings({
+            proyectoId: input.proyectoId,
+            tipo: 'proveedor_historial',
+            titulo: historialTitulo,
+            documentoId: null,
+            chunks: historialChunks,
+            embeddings: historialEmbeddings,
+            metadata: { proveedorId: input.proveedorId },
+          });
+        }
+
+        let recargosInsertados = 0;
+        if (input.propuestaId && extraccion) {
+          if (extraccion.montoTotal !== null) {
+            await propuestas.update(input.propuestaId, { monto: extraccion.montoTotal });
+          }
+
+          recargosInsertados = await recargos.replaceForPropuesta(
+            input.propuestaId,
+            extraccion.recargos,
+          );
+        }
+
+        await audit.record({
+          action: 'documento.upload',
+          resource: 'documento',
+          resourceId: documentoId,
+        });
+
+        return { documentoId, chunksInsertados, historialInsertados, recargosInsertados };
+      },
+    );
 
     const documento = await this.#reader.listByProyecto(input.proyectoId);
     const creado = documento.find((item) => item.id === resultado.documentoId);
@@ -183,7 +209,32 @@ export class DocumentoService {
       documento: creado,
       chunks: resultado.chunksInsertados,
       proveedorHistorialChunks: input.proveedorId ? resultado.historialInsertados : undefined,
+      extraccion: input.propuestaId
+        ? {
+            montoTotal: extraccion?.montoTotal ?? null,
+            recargos: resultado.recargosInsertados,
+          }
+        : null,
     };
+  }
+
+  async eliminar(id: string): Promise<{ id: string }> {
+    return this.#runInTransaction(async ({ documentos, audit }) => {
+      const eliminado = await documentos.remove(id);
+
+      if (!eliminado) {
+        throw new DocumentoNoEncontradoError(id);
+      }
+
+      // Knowledge chunks cascade with the documento (documento_id FK).
+      await audit.record({
+        action: 'documento.delete',
+        resource: 'documento',
+        resourceId: id,
+      });
+
+      return { id };
+    });
   }
 
   async #extraer(mime: string, bytes: Buffer, nombre: string): Promise<string> {
@@ -224,6 +275,13 @@ export class DocumentoVacioError extends Error {
   constructor() {
     super('The uploaded document is empty');
     this.name = 'DocumentoVacioError';
+  }
+}
+
+export class DocumentoNoEncontradoError extends Error {
+  constructor(id: string) {
+    super(`Documento ${id} not found`);
+    this.name = 'DocumentoNoEncontradoError';
   }
 }
 

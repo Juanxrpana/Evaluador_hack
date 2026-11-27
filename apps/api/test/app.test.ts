@@ -52,6 +52,10 @@ beforeAll(async () => {
     propuestas: stub(),
     documentos: stub(),
     chat: stub(),
+    notas: stub(),
+    estatus: stub(),
+    recargos: stub(),
+    conocimiento: stub(),
   });
 
   server = createServer(app);

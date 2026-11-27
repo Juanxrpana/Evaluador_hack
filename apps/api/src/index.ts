@@ -20,6 +20,24 @@ import { PostgresConocimientoWriter } from './modules/documentos/postgres-conoci
 import { PostgresDocumentoWriter } from './modules/documentos/postgres-documento.writer.ts';
 import { ImagenDescriber } from './modules/documentos/imagen.describer.ts';
 import { PdfExtractor } from './modules/documentos/pdf.extractor.ts';
+import { LlmMontosExtractor } from './modules/documentos/llm-montos.extractor.ts';
+import {
+  PostgresConocimientoListReader,
+  ConocimientoListService,
+} from './modules/documentos/postgres-conocimiento.list.ts';
+import { PostgresRecargoReader } from './modules/recargos/postgres-recargo.reader.ts';
+import { PostgresRecargoWriter } from './modules/recargos/postgres-recargo.writer.ts';
+import { PostgresNotaReader } from './modules/notas/postgres-nota.reader.ts';
+import type { NotaTransaction, NotaTransactionRunner } from './modules/notas/nota.transaction.ts';
+import { PostgresNotaWriter } from './modules/notas/postgres-nota.writer.ts';
+import { NotaService } from './modules/notas/nota.service.ts';
+import { PostgresEstatusReader } from './modules/estatus/postgres-estatus.reader.ts';
+import type {
+  EstatusTransaction,
+  EstatusTransactionRunner,
+} from './modules/estatus/estatus.transaction.ts';
+import { PostgresEstatusWriter } from './modules/estatus/postgres-estatus.writer.ts';
+import { EstatusService } from './modules/estatus/estatus.service.ts';
 import { PostgresProveedorReader } from './modules/proveedores/postgres-proveedor.reader.ts';
 import type {
   ProveedorTransaction,
@@ -102,6 +120,22 @@ const runInDocumentoTransaction: DocumentoTransactionRunner =
   createTransactionRunner<DocumentoTransaction>(db, (trx) => ({
     documentos: new PostgresDocumentoWriter(trx),
     conocimiento: new PostgresConocimientoWriter(trx),
+    propuestas: new PostgresPropuestaWriter(trx),
+    recargos: new PostgresRecargoWriter(trx),
+    audit: new PostgresAuditWriter(trx, auditContext()),
+  }));
+
+const runInNotaTransaction: NotaTransactionRunner = createTransactionRunner<NotaTransaction>(
+  db,
+  (trx) => ({
+    notas: new PostgresNotaWriter(trx),
+    audit: new PostgresAuditWriter(trx, auditContext()),
+  }),
+);
+
+const runInEstatusTransaction: EstatusTransactionRunner =
+  createTransactionRunner<EstatusTransaction>(db, (trx) => ({
+    estatus: new PostgresEstatusWriter(trx),
     audit: new PostgresAuditWriter(trx, auditContext()),
   }));
 
@@ -137,6 +171,7 @@ const documentos: DocumentoService = new DocumentoService(
   proveedorReader,
   extractor,
   embeddings,
+  new LlmMontosExtractor(llm),
 );
 
 const chat: ChatService = new ChatService(
@@ -147,6 +182,16 @@ const chat: ChatService = new ChatService(
   embeddings,
   llm,
 );
+
+const notas = new NotaService(new PostgresNotaReader(db), runInNotaTransaction, propuestaReader);
+const estatus = new EstatusService(
+  new PostgresEstatusReader(db),
+  runInEstatusTransaction,
+  proyectoReader,
+  propuestaReader,
+);
+const recargos = new PostgresRecargoReader(db);
+const conocimiento = new ConocimientoListService(new PostgresConocimientoListReader(db));
 
 const app = createApp({
   auth: createAuth(db, {
@@ -160,6 +205,10 @@ const app = createApp({
   propuestas,
   documentos,
   chat,
+  notas,
+  estatus,
+  recargos,
+  conocimiento,
 });
 const server = createServer(app);
 

@@ -1,8 +1,9 @@
-import type { ProveedorHistorial } from '@repo/contracts';
+import type { ProveedorHistorial, Recargo } from '@repo/contracts';
 import type { Proveedor } from '@repo/contracts';
 import type { Kysely } from 'kysely';
 import type { DB } from '../../db/schema.generated.ts';
 import { toProveedor } from './proveedor.mapper.ts';
+import { toRecargo } from '../recargos/recargo.mapper.ts';
 import type { ProveedorReader } from './proveedor.reader.ts';
 
 interface PropuestaHistorialRow {
@@ -69,21 +70,23 @@ export class PostgresProveedorReader implements ProveedorReader {
       .orderBy('propuesta.created_at', 'asc')
       .execute();
 
-    const recargosPorPropuesta = new Map<string, number>();
+    const recargosPorPropuesta = new Map<string, Recargo[]>();
     if (propuestas.length > 0) {
       const recargos = await this.#db
         .selectFrom('recargos')
-        .select(['propuesta_id', 'monto'])
+        .selectAll()
         .where(
           'propuesta_id',
           'in',
           propuestas.map((propuesta) => propuesta.propuestaId),
         )
+        .orderBy('created_at', 'asc')
         .execute();
 
       for (const recargo of recargos) {
-        const actual = recargosPorPropuesta.get(recargo.propuesta_id) ?? 0;
-        recargosPorPropuesta.set(recargo.propuesta_id, actual + Number(recargo.monto));
+        const lista = recargosPorPropuesta.get(recargo.propuesta_id) ?? [];
+        lista.push(toRecargo(recargo));
+        recargosPorPropuesta.set(recargo.propuesta_id, lista);
       }
     }
 
@@ -109,9 +112,10 @@ export class PostgresProveedorReader implements ProveedorReader {
 
   #toEntrada(
     propuesta: PropuestaHistorialRow,
-    recargosPorPropuesta: Map<string, number>,
+    recargosPorPropuesta: Map<string, Recargo[]>,
   ): ProveedorHistorial['entradas'][number] {
-    const recargosTotal = recargosPorPropuesta.get(propuesta.propuestaId) ?? 0;
+    const conceptos = recargosPorPropuesta.get(propuesta.propuestaId) ?? [];
+    const recargosTotal = conceptos.reduce((sum, recargo) => sum + Number(recargo.monto), 0);
 
     return {
       propuestaId: propuesta.propuestaId,
@@ -119,6 +123,7 @@ export class PostgresProveedorReader implements ProveedorReader {
       proyectoNombre: propuesta.proyectoNombre,
       monto: propuesta.monto,
       recargosTotal: aMonto(recargosTotal),
+      recargos: conceptos,
       estado: propuesta.estado,
       createdAt: toIsoString(propuesta.createdAt),
     };

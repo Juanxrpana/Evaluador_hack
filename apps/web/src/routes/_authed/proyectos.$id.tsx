@@ -1,16 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState, type FormEvent } from 'react';
+import type { Propuesta, Proveedor } from '@repo/contracts';
 import { messageOf } from '../../lib/errors';
 import { orpc } from '../../lib/orpc';
-import type { Proveedor } from '@repo/contracts';
-
-interface MensajeChat {
-  id: string;
-  rol: 'usuario' | 'asistente';
-  texto: string;
-  fuentes?: Array<{ id: string; titulo: string | null; tipo: string }>;
-}
 
 export const Route = createFileRoute('/_authed/proyectos/$id')({
   component: ProyectoDetallePage,
@@ -18,6 +11,9 @@ export const Route = createFileRoute('/_authed/proyectos/$id')({
 
 function ProyectoDetallePage() {
   const { id } = Route.useParams();
+  const queryClient = useQueryClient();
+  const navegar = useNavigate();
+
   const { data: proyectos } = useQuery(orpc.proyectos.list.queryOptions());
   const { data: proveedores } = useQuery(orpc.proveedores.list.queryOptions());
   const { data: propuestas } = useQuery(
@@ -26,8 +22,23 @@ function ProyectoDetallePage() {
   const { data: documentos } = useQuery(
     orpc.documentos.list.queryOptions({ input: { proyectoId: id } }),
   );
+  const { data: conocimiento } = useQuery(
+    orpc.conocimiento.list.queryOptions({ input: { proyectoId: id } }),
+  );
 
   const proyecto = (proyectos ?? []).find((item) => item.id === id);
+  const invalidar = () =>
+    Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: orpc.documentos.list.queryKey({ input: { proyectoId: id } }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.conocimiento.list.queryKey({ input: { proyectoId: id } }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.propuestas.list.queryKey({ input: { proyectoId: id } }),
+      }),
+    ]);
 
   if (!proyecto) {
     return (
@@ -39,27 +50,152 @@ function ProyectoDetallePage() {
 
   return (
     <section className="stack">
-      <p className="eyebrow">Proyecto</p>
-      <h1>{proyecto.nombre}</h1>
-      <p className="lede">{proyecto.descripcion ?? 'Sin descripción'}</p>
-
-      <ProveedoresDelProyecto proveedores={proveedores ?? []} />
-      <PropuestasDelProyecto
+      <CabeceraProyecto
         proyectoId={id}
-        proveedores={proveedores ?? []}
-        propuestas={propuestas ?? []}
+        nombre={proyecto.nombre}
+        descripcion={proyecto.descripcion}
+        onDeleted={() => navegar({ to: '/proyectos' })}
       />
-      <DocumentosDelProyecto
+
+      <ProveedoresPanel proveedores={proveedores ?? []} />
+
+      <DocumentosPanel
         proyectoId={id}
+        propuestas={propuestas ?? []}
         proveedores={proveedores ?? []}
         documentos={documentos ?? []}
+        onChanged={invalidar}
       />
+
+      <div className="stack">
+        <h2 style={{ margin: 0 }}>Propuestas</h2>
+        {(propuestas ?? []).map((propuesta) => (
+          <PropuestaCard
+            key={propuesta.id}
+            propuesta={propuesta}
+            proveedores={proveedores ?? []}
+            onChanged={invalidar}
+          />
+        ))}
+        {(propuestas ?? []).length === 0 && (
+          <p className="lede">
+            Sin propuestas todavía: registra un proveedor y crea una propuesta.
+          </p>
+        )}
+      </div>
+
       <ChatDelProyecto proyectoId={id} />
+
+      <ConocimientoPanel chunks={conocimiento ?? []} />
     </section>
   );
 }
 
-function ProveedoresDelProyecto({ proveedores }: { proveedores: Proveedor[] }) {
+function CabeceraProyecto({
+  proyectoId,
+  nombre,
+  descripcion,
+  onDeleted,
+}: {
+  proyectoId: string;
+  nombre: string;
+  descripcion: string | null;
+  onDeleted: () => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState(nombre);
+  const [nuevaDescripcion, setNuevaDescripcion] = useState(descripcion ?? '');
+  const [error, setError] = useState<string | null>(null);
+
+  const actualizar = useMutation(
+    orpc.proyectos.update.mutationOptions({
+      onSuccess: () => {
+        setEditando(false);
+        setError(null);
+      },
+      onError: (cause) => setError(messageOf(cause)),
+    }),
+  );
+
+  const eliminar = useMutation(
+    orpc.proyectos.delete.mutationOptions({
+      onSuccess: () => onDeleted(),
+      onError: (cause) => setError(messageOf(cause)),
+    }),
+  );
+
+  return (
+    <div className="stack">
+      <p className="eyebrow">Proyecto</p>
+      {editando ? (
+        <form
+          className="form-panel"
+          onSubmit={(event: FormEvent) => {
+            event.preventDefault();
+            actualizar.mutate({
+              id: proyectoId,
+              nombre: nuevoNombre,
+              ...(nuevaDescripcion.trim()
+                ? { descripcion: nuevaDescripcion.trim() }
+                : { descripcion: null }),
+            });
+          }}
+        >
+          <div className="field">
+            <label htmlFor="editar-nombre">Nombre</label>
+            <input
+              id="editar-nombre"
+              value={nuevoNombre}
+              onChange={(event) => setNuevoNombre(event.target.value)}
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="editar-descripcion">Descripción</label>
+            <input
+              id="editar-descripcion"
+              value={nuevaDescripcion}
+              onChange={(event) => setNuevaDescripcion(event.target.value)}
+            />
+          </div>
+          <div className="acciones">
+            <button type="submit" disabled={actualizar.isPending}>
+              Guardar
+            </button>
+            <button type="button" className="boton-fantasma" onClick={() => setEditando(false)}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <h1>{nombre}</h1>
+          <p className="lede">{descripcion ?? 'Sin descripción'}</p>
+          <div className="acciones">
+            <button type="button" className="boton-fantasma" onClick={() => setEditando(true)}>
+              Editar proyecto
+            </button>
+            <button
+              type="button"
+              className="boton-peligro"
+              disabled={eliminar.isPending}
+              onClick={() => {
+                if (window.confirm(`¿Eliminar "${nombre}" y todo su contenido?`)) {
+                  eliminar.mutate({ id: proyectoId });
+                }
+              }}
+            >
+              {eliminar.isPending ? '…' : 'Eliminar proyecto'}
+            </button>
+          </div>
+        </>
+      )}
+      {error && <p className="field-error">{error}</p>}
+    </div>
+  );
+}
+
+function ProveedoresPanel({ proveedores }: { proveedores: Proveedor[] }) {
   const queryClient = useQueryClient();
   const [nombre, setNombre] = useState('');
   const [contacto, setContacto] = useState('');
@@ -92,7 +228,6 @@ function ProveedoresDelProyecto({ proveedores }: { proveedores: Proveedor[] }) {
           id="proveedor-nombre"
           value={nombre}
           onChange={(event) => setNombre(event.target.value)}
-          placeholder="Constructora Andina S.A."
           required
         />
       </div>
@@ -102,7 +237,6 @@ function ProveedoresDelProyecto({ proveedores }: { proveedores: Proveedor[] }) {
           id="proveedor-contacto"
           value={contacto}
           onChange={(event) => setContacto(event.target.value)}
-          placeholder="correo@proveedor.com"
         />
       </div>
       {error && <p className="field-error">{error}</p>}
@@ -110,121 +244,21 @@ function ProveedoresDelProyecto({ proveedores }: { proveedores: Proveedor[] }) {
         {crear.isPending ? 'Registrando…' : 'Registrar proveedor'}
       </button>
       <p className="lede">
-        Proveedores registrados: {(proveedores ?? []).length === 0 ? 'ninguno' : ''}
+        Registrados: {proveedores.map((proveedor) => proveedor.nombre).join(', ') || 'ninguno'}
       </p>
-      <ul className="user-list">
-        {(proveedores ?? []).map((proveedor) => (
-          <li key={proveedor.id}>
-            <div>
-              <strong>{proveedor.nombre}</strong>
-              <span>{proveedor.contacto ?? 'Sin contacto'}</span>
-            </div>
-          </li>
-        ))}
-      </ul>
     </form>
   );
 }
 
-function PropuestasDelProyecto({
+function DocumentosPanel({
   proyectoId,
-  proveedores,
   propuestas,
-}: {
-  proyectoId: string;
-  proveedores: Proveedor[];
-  propuestas: Array<{ id: string; proveedorId: string; monto: string | null; createdAt: string }>;
-}) {
-  const queryClient = useQueryClient();
-  const [proveedorId, setProveedorId] = useState('');
-  const [monto, setMonto] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const crear = useMutation(
-    orpc.propuestas.create.mutationOptions({
-      onSuccess: () => {
-        setMonto('');
-        setError(null);
-        return queryClient.invalidateQueries({
-          queryKey: orpc.propuestas.list.queryKey({ input: { proyectoId } }),
-        });
-      },
-      onError: (cause) => setError(messageOf(cause)),
-    }),
-  );
-
-  const nombreDe = (id: string) =>
-    proveedores.find((proveedor) => proveedor.id === id)?.nombre ?? id;
-
-  return (
-    <form
-      className="form-panel"
-      onSubmit={(event) => {
-        event.preventDefault();
-        crear.mutate({
-          proyectoId,
-          proveedorId,
-          ...(monto.trim() ? { monto: monto.trim() } : {}),
-        });
-      }}
-    >
-      <h2>Propuesta</h2>
-      <div className="field">
-        <label htmlFor="propuesta-proveedor">Proveedor</label>
-        <select
-          id="propuesta-proveedor"
-          value={proveedorId}
-          onChange={(event) => setProveedorId(event.target.value)}
-          required
-        >
-          <option value="" disabled>
-            Selecciona un proveedor
-          </option>
-          {proveedores.map((proveedor) => (
-            <option key={proveedor.id} value={proveedor.id}>
-              {proveedor.nombre}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label htmlFor="propuesta-monto">Monto (opcional, ej. 125000.00)</label>
-        <input
-          id="propuesta-monto"
-          value={monto}
-          onChange={(event) => setMonto(event.target.value)}
-          inputMode="decimal"
-          placeholder="125000.00"
-        />
-      </div>
-      {error && <p className="field-error">{error}</p>}
-      <button type="submit" disabled={crear.isPending || proveedorId === ''}>
-        {crear.isPending ? 'Creando…' : 'Crear propuesta'}
-      </button>
-
-      <ul className="user-list">
-        {propuestas.map((propuesta) => (
-          <li key={propuesta.id}>
-            <div>
-              <strong>{nombreDe(propuesta.proveedorId)}</strong>
-              <span>{propuesta.monto ? `Monto: ${propuesta.monto}` : 'Sin monto'}</span>
-            </div>
-            <time dateTime={propuesta.createdAt}>
-              {new Date(propuesta.createdAt).toLocaleDateString()}
-            </time>
-          </li>
-        ))}
-      </ul>
-    </form>
-  );
-}
-
-function DocumentosDelProyecto({
-  proyectoId,
   proveedores,
   documentos,
+  onChanged,
 }: {
   proyectoId: string;
+  propuestas: Propuesta[];
   proveedores: Proveedor[];
   documentos: Array<{
     id: string;
@@ -232,24 +266,34 @@ function DocumentosDelProyecto({
     mime: string;
     tamanoBytes: number;
     createdAt: string;
+    propuestaId: string | null;
+    proveedorId: string | null;
   }>;
+  onChanged: () => Promise<unknown>;
 }) {
-  const queryClient = useQueryClient();
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [propuestaId, setPropuestaId] = useState('');
   const [proveedorId, setProveedorId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const subir = useMutation(
     orpc.documentos.upload.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (resultado) => {
         setArchivo(null);
         setError(null);
-        return queryClient.invalidateQueries({
-          queryKey: orpc.documentos.list.queryKey({ input: { proyectoId } }),
-        });
+        if (resultado.extraccion) {
+          window.alert(
+            `IA: monto ${resultado.extraccion.montoTotal ?? 'no detectado'}; ${resultado.extraccion.recargos} recargos registrados.`,
+          );
+        }
+        return onChanged();
       },
       onError: (cause) => setError(messageOf(cause)),
     }),
+  );
+
+  const eliminar = useMutation(
+    orpc.documentos.delete.mutationOptions({ onSuccess: () => onChanged() }),
   );
 
   async function handleSubmit(event: FormEvent) {
@@ -279,12 +323,19 @@ function DocumentosDelProyecto({
       reader.readAsDataURL(archivo);
     });
 
+    const propuestaElegida = propuestas.find((item) => item.id === propuestaId);
+
     subir.mutate({
       proyectoId,
       nombre: archivo.name,
       mime,
       contenidoBase64,
-      ...(proveedorId ? { proveedorId } : {}),
+      // Si la propuesta tiene proveedor, se hereda automáticamente.
+      ...(propuestaElegida
+        ? { propuestaId, proveedorId: propuestaElegida.proveedorId }
+        : proveedorId
+          ? { proveedorId }
+          : {}),
     });
   }
 
@@ -292,9 +343,8 @@ function DocumentosDelProyecto({
     <form className="form-panel" onSubmit={handleSubmit}>
       <h2>Documentos</h2>
       <p className="lede">
-        PDFs e imágenes se guardan en PostgreSQL, se trocean y se vectorizan (bge-m3) dentro de la
-        base de conocimiento del proyecto. Si eliges un proveedor, su historial de costos se
-        reconstruye y también queda vectorizado.
+        PDFs e imágenes se guardan en PostgreSQL y se vectorizan (bge-m3). Si lo vinculas a una
+        propuesta, la IA extrae el monto ofertado y los recargos cobrados aparte.
       </p>
       <div className="field">
         <label htmlFor="documento-archivo">Archivo (PDF, PNG o JPG)</label>
@@ -306,20 +356,38 @@ function DocumentosDelProyecto({
         />
       </div>
       <div className="field">
-        <label htmlFor="documento-proveedor">Proveedor del documento (opcional)</label>
+        <label htmlFor="documento-propuesta">Vincular a propuesta (opcional)</label>
         <select
-          id="documento-proveedor"
-          value={proveedorId}
-          onChange={(event) => setProveedorId(event.target.value)}
+          id="documento-propuesta"
+          value={propuestaId}
+          onChange={(event) => setPropuestaId(event.target.value)}
         >
-          <option value="">Sin proveedor</option>
-          {proveedores.map((proveedor) => (
-            <option key={proveedor.id} value={proveedor.id}>
-              {proveedor.nombre}
+          <option value="">Sin propuesta (solo conocimiento)</option>
+          {propuestas.map((propuesta) => (
+            <option key={propuesta.id} value={propuesta.id}>
+              {proveedores.find((proveedor) => proveedor.id === propuesta.proveedorId)?.nombre ??
+                propuesta.id}
             </option>
           ))}
         </select>
       </div>
+      {!propuestaId && (
+        <div className="field">
+          <label htmlFor="documento-proveedor">Proveedor del documento (opcional)</label>
+          <select
+            id="documento-proveedor"
+            value={proveedorId}
+            onChange={(event) => setProveedorId(event.target.value)}
+          >
+            <option value="">Sin proveedor</option>
+            {proveedores.map((proveedor) => (
+              <option key={proveedor.id} value={proveedor.id}>
+                {proveedor.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {error && <p className="field-error">{error}</p>}
       <button type="submit" disabled={subir.isPending || !archivo}>
         {subir.isPending ? 'Procesando documento…' : 'Subir y vectorizar'}
@@ -332,11 +400,17 @@ function DocumentosDelProyecto({
               <strong>{documento.nombre}</strong>
               <span>
                 {documento.mime} · {(documento.tamanoBytes / 1024).toFixed(0)} KB
+                {documento.propuestaId ? ' · vinculado a propuesta' : ''}
               </span>
             </div>
-            <time dateTime={documento.createdAt}>
-              {new Date(documento.createdAt).toLocaleDateString()}
-            </time>
+            <button
+              type="button"
+              className="boton-peligro"
+              disabled={eliminar.isPending}
+              onClick={() => eliminar.mutate({ id: documento.id })}
+            >
+              {eliminar.isPending ? '…' : 'Eliminar'}
+            </button>
           </li>
         ))}
       </ul>
@@ -344,8 +418,226 @@ function DocumentosDelProyecto({
   );
 }
 
+function PropuestaCard({
+  propuesta,
+  proveedores,
+  onChanged,
+}: {
+  propuesta: Propuesta;
+  proveedores: Proveedor[];
+  onChanged: () => Promise<unknown>;
+}) {
+  const proveedor = proveedores.find((item) => item.id === propuesta.proveedorId);
+  const [monto, setMonto] = useState(propuesta.monto ?? '');
+  const [textoNota, setTextoNota] = useState('');
+  const [nuevoEstado, setNuevoEstado] = useState('');
+  const [nuevoComentario, setNuevoComentario] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: recargos } = useQuery(
+    orpc.recargos.list.queryOptions({ input: { propuestaId: propuesta.id } }),
+  );
+  const { data: notas } = useQuery(
+    orpc.notas.list.queryOptions({ input: { propuestaId: propuesta.id } }),
+  );
+  const { data: estatuses } = useQuery(
+    orpc.estatus.list.queryOptions({ input: { propuestaId: propuesta.id } }),
+  );
+
+  const actualizar = useMutation(
+    orpc.propuestas.update.mutationOptions({
+      onSuccess: () => {
+        setError(null);
+        return onChanged();
+      },
+      onError: (cause) => setError(messageOf(cause)),
+    }),
+  );
+
+  const eliminar = useMutation(
+    orpc.propuestas.delete.mutationOptions({
+      onSuccess: () => onChanged(),
+      onError: (cause) => setError(messageOf(cause)),
+    }),
+  );
+
+  const crearNota = useMutation(
+    orpc.notas.create.mutationOptions({
+      onSuccess: () => {
+        setTextoNota('');
+        return onChanged();
+      },
+      onError: (cause) => setError(messageOf(cause)),
+    }),
+  );
+
+  const eliminarNota = useMutation(
+    orpc.notas.delete.mutationOptions({ onSuccess: () => onChanged() }),
+  );
+
+  const crearEstatus = useMutation(
+    orpc.estatus.create.mutationOptions({
+      onSuccess: () => {
+        setNuevoEstado('');
+        setNuevoComentario('');
+        return onChanged();
+      },
+      onError: (cause) => setError(messageOf(cause)),
+    }),
+  );
+
+  const eliminarEstatus = useMutation(
+    orpc.estatus.delete.mutationOptions({ onSuccess: () => onChanged() }),
+  );
+
+  return (
+    <form className="form-panel" onSubmit={(event) => event.preventDefault()}>
+      <div className="acciones" style={{ justifyContent: 'space-between' }}>
+        <h2 style={{ margin: 0 }}>{proveedor?.nombre ?? 'Propuesta'}</h2>
+        <span className="badge">{recargos?.length ?? 0} recargos IA</span>
+      </div>
+
+      <div className="acciones">
+        <input
+          value={monto}
+          onChange={(event) => setMonto(event.target.value)}
+          placeholder="Monto base (ej. 125000.00)"
+          style={{ maxWidth: '240px' }}
+        />
+        <button
+          type="button"
+          className="boton-fantasma"
+          disabled={monto.trim().length === 0 || actualizar.isPending}
+          onClick={() => actualizar.mutate({ id: propuesta.id, monto: monto.trim() })}
+        >
+          Guardar monto
+        </button>
+        <button
+          type="button"
+          className="boton-peligro"
+          disabled={eliminar.isPending}
+          onClick={() => {
+            if (window.confirm('¿Eliminar la propuesta con sus recargos, notas y estatus?')) {
+              eliminar.mutate({ id: propuesta.id });
+            }
+          }}
+        >
+          {eliminar.isPending ? '…' : 'Eliminar propuesta'}
+        </button>
+      </div>
+
+      {error && <p className="field-error">{error}</p>}
+
+      <ul className="sub-lista">
+        {(recargos ?? []).map((recargo) => (
+          <li key={recargo.id}>
+            <strong>{recargo.concepto}</strong>
+            <span>{recargo.monto}</span>
+          </li>
+        ))}
+        {(recargos ?? []).length === 0 && (
+          <li>
+            <span>La IA aún no detecta recargos: sube el documento de la propuesta.</span>
+          </li>
+        )}
+      </ul>
+
+      <ul className="sub-lista">
+        {(notas ?? []).map((nota) => (
+          <li key={nota.id}>
+            <strong>{nota.texto}</strong>
+            <button
+              type="button"
+              className="boton-peligro"
+              onClick={() => eliminarNota.mutate({ id: nota.id })}
+            >
+              ✕
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="acciones">
+        <input
+          value={textoNota}
+          onChange={(event) => setTextoNota(event.target.value)}
+          placeholder="Nueva nota sobre la propuesta"
+          style={{ maxWidth: '320px' }}
+        />
+        <button
+          type="button"
+          className="boton-fantasma"
+          disabled={textoNota.trim().length < 1 || crearNota.isPending}
+          onClick={() => crearNota.mutate({ propuestaId: propuesta.id, texto: textoNota.trim() })}
+        >
+          Añadir nota
+        </button>
+      </div>
+
+      <ul className="sub-lista">
+        {(estatuses ?? []).map((item) => (
+          <li key={item.id}>
+            <strong>Estado {item.estado}</strong>
+            <span>
+              {item.comentario ?? 'sin comentario'}
+              <button
+                type="button"
+                className="boton-peligro"
+                style={{ marginLeft: '0.6rem' }}
+                onClick={() => eliminarEstatus.mutate({ id: item.id })}
+              >
+                ✕
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="acciones">
+        <input
+          value={nuevoEstado}
+          onChange={(event) => setNuevoEstado(event.target.value)}
+          placeholder="Estado (número)"
+          style={{ maxWidth: '160px' }}
+        />
+        <input
+          value={nuevoComentario}
+          onChange={(event) => setNuevoComentario(event.target.value)}
+          placeholder="Comentario (opcional)"
+          style={{ maxWidth: '280px' }}
+        />
+        <button
+          type="button"
+          className="boton-fantasma"
+          disabled={nuevoEstado.trim().length === 0 || crearEstatus.isPending}
+          onClick={() => {
+            const estado = Number(nuevoEstado);
+            if (!Number.isInteger(estado)) {
+              setError('El estado debe ser un número entero.');
+              return;
+            }
+
+            crearEstatus.mutate({
+              propuestaId: propuesta.id,
+              estado,
+              ...(nuevoComentario.trim() ? { comentario: nuevoComentario.trim() } : {}),
+            });
+          }}
+        >
+          Añadir estatus
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function ChatDelProyecto({ proyectoId }: { proyectoId: string }) {
-  const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
+  const [mensajes, setMensajes] = useState<
+    Array<{
+      id: string;
+      rol: 'usuario' | 'asistente';
+      texto: string;
+      fuentes?: Array<{ id: string; titulo: string | null; tipo: string }>;
+    }>
+  >([]);
   const [pregunta, setPregunta] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -381,19 +673,12 @@ function ChatDelProyecto({ proyectoId }: { proyectoId: string }) {
     }
 
     setMensajes((previos) => [...previos, { id: crypto.randomUUID(), rol: 'usuario', texto }]);
-    preguntar.mutate({
-      proyectoId,
-      pregunta: texto,
-    });
+    preguntar.mutate({ proyectoId, pregunta: texto });
   }
 
   return (
-    <form className="form-panel" onSubmit={(event) => enviar(event)}>
+    <form className="form-panel" onSubmit={enviar}>
       <h2>Chat con la IA del proyecto</h2>
-      <p className="lede">
-        La IA responde usando los documentos vectorizados del proyecto y el historial de costos de
-        sus proveedores. Nunca consulta conocimiento de otros proyectos.
-      </p>
 
       <div className="stack">
         {mensajes.map((mensaje) => (
@@ -425,6 +710,33 @@ function ChatDelProyecto({ proyectoId }: { proyectoId: string }) {
       <button type="submit" disabled={preguntar.isPending || pregunta.trim().length < 3}>
         {preguntar.isPending ? 'Consultando a la IA…' : 'Preguntar'}
       </button>
+    </form>
+  );
+}
+
+function ConocimientoPanel({
+  chunks,
+}: {
+  chunks: Array<{ id: string; titulo: string | null; tipo: string; contenido: string }>;
+}) {
+  return (
+    <form className="form-panel" onSubmit={(event) => event.preventDefault()}>
+      <h2>Conocimiento vectorizado ({chunks.length} fragmentos)</h2>
+      <ul className="sub-lista">
+        {chunks.map((chunk) => (
+          <li key={chunk.id}>
+            <strong>
+              {chunk.titulo ?? 'sin título'} <span className="badge">{chunk.tipo}</span>
+            </strong>
+            <span>{chunk.contenido.slice(0, 140)}…</span>
+          </li>
+        ))}
+        {chunks.length === 0 && (
+          <li>
+            <span>Sin fragmentos: sube documentos para llenar la base.</span>
+          </li>
+        )}
+      </ul>
     </form>
   );
 }

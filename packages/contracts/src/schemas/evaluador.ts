@@ -22,6 +22,11 @@ export const proyectoInput = z.object({
   descripcion: z.string().trim().max(2000).optional(),
 });
 
+export const proyectoUpdate = z.object({
+  nombre: z.string().trim().min(1).max(200).optional(),
+  descripcion: z.string().trim().max(2000).nullish(),
+});
+
 export const proveedorSchema = z.object({
   id: z.uuid(),
   nombre: z.string().trim().min(1).max(200),
@@ -32,6 +37,11 @@ export const proveedorSchema = z.object({
 export const proveedorInput = z.object({
   nombre: z.string().trim().min(1).max(200),
   contacto: z.string().trim().max(300).optional(),
+});
+
+export const proveedorUpdate = z.object({
+  nombre: z.string().trim().min(1).max(200).optional(),
+  contacto: z.string().trim().max(300).nullish(),
 });
 
 export const propuestaSchema = z.object({
@@ -46,6 +56,77 @@ export const propuestaInput = z.object({
   proyectoId: z.uuid(),
   proveedorId: z.uuid(),
   monto: montoSchema.optional(),
+});
+
+export const propuestaUpdate = z.object({
+  monto: montoSchema.nullish(),
+});
+
+/** Surcharges the LLM extracts from proposal documents (flete, etc.). */
+export const recargoSchema = z.object({
+  id: z.uuid(),
+  propuestaId: z.uuid(),
+  concepto: z.string().trim().min(1).max(200),
+  monto: montoSchema,
+  createdAt: z.iso.datetime(),
+});
+
+export const recargoExtraido = z.object({
+  concepto: z.string().trim().min(1).max(200),
+  monto: montoSchema,
+});
+
+export const notaSchema = z.object({
+  id: z.uuid(),
+  propuestaId: z.uuid(),
+  texto: z.string().trim().min(1).max(5000),
+  createdAt: z.iso.datetime(),
+});
+
+export const notaInput = z.object({
+  propuestaId: z.uuid(),
+  texto: z.string().trim().min(1).max(5000),
+});
+
+export const notaUpdate = z.object({
+  texto: z.string().trim().min(1).max(5000),
+});
+
+export const estatusSchema = z.object({
+  id: z.uuid(),
+  proyectoId: z.uuid().nullable(),
+  propuestaId: z.uuid().nullable(),
+  estado: z.number().int().min(0).max(32767),
+  comentario: z.string().trim().max(2000).nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+export const estatusInput = z
+  .object({
+    proyectoId: z.uuid().optional(),
+    propuestaId: z.uuid().optional(),
+    estado: z.number().int().min(0).max(32767),
+    comentario: z.string().trim().max(2000).optional(),
+  })
+  .refine(
+    (input) => Boolean(input.proyectoId) !== Boolean(input.propuestaId),
+    'estatus needs exactly one of proyectoId or propuestaId',
+  );
+
+export const estatusUpdate = z.object({
+  estado: z.number().int().min(0).max(32767).optional(),
+  comentario: z.string().trim().max(2000).nullish(),
+});
+
+export const conocimientoSchema = z.object({
+  id: z.uuid(),
+  proyectoId: z.uuid(),
+  titulo: z.string().nullable(),
+  tipo: z.string(),
+  chunkIndex: z.number().int().nullable(),
+  documentoId: z.uuid().nullable(),
+  contenido: z.string(),
+  createdAt: z.iso.datetime(),
 });
 
 /** Public metadata of an uploaded document. Bytes never leave the server. */
@@ -73,6 +154,13 @@ export const documentoUploadResponse = z.object({
   documento: documentoSchema,
   chunks: z.number().int().nonnegative(),
   proveedorHistorialChunks: z.number().int().nonnegative().optional(),
+  /** LLM extraction result when the document was attached to a propuesta. */
+  extraccion: z
+    .object({
+      montoTotal: montoSchema.nullable(),
+      recargos: z.number().int().nonnegative(),
+    })
+    .nullable(),
 });
 
 /** One historical cost entry of a proveedor, derived from propuestas. */
@@ -82,6 +170,7 @@ export const historialEntradaSchema = z.object({
   proyectoNombre: z.string(),
   monto: montoSchema.nullable(),
   recargosTotal: montoSchema,
+  recargos: z.array(recargoSchema),
   estado: z.number().int().nullable(),
   createdAt: z.iso.datetime(),
 });
@@ -119,10 +208,22 @@ export const chatAskInput = z.object({
 
 export type Proyecto = z.infer<typeof proyectoSchema>;
 export type ProyectoInput = z.infer<typeof proyectoInput>;
+export type ProyectoUpdate = z.infer<typeof proyectoUpdate>;
 export type Proveedor = z.infer<typeof proveedorSchema>;
 export type ProveedorInput = z.infer<typeof proveedorInput>;
+export type ProveedorUpdate = z.infer<typeof proveedorUpdate>;
 export type Propuesta = z.infer<typeof propuestaSchema>;
 export type PropuestaInput = z.infer<typeof propuestaInput>;
+export type PropuestaUpdate = z.infer<typeof propuestaUpdate>;
+export type Recargo = z.infer<typeof recargoSchema>;
+export type RecargoExtraido = z.infer<typeof recargoExtraido>;
+export type Nota = z.infer<typeof notaSchema>;
+export type NotaInput = z.infer<typeof notaInput>;
+export type NotaUpdate = z.infer<typeof notaUpdate>;
+export type Estatus = z.infer<typeof estatusSchema>;
+export type EstatusInput = z.infer<typeof estatusInput>;
+export type EstatusUpdate = z.infer<typeof estatusUpdate>;
+export type Conocimiento = z.infer<typeof conocimientoSchema>;
 export type Documento = z.infer<typeof documentoSchema>;
 export type DocumentoUploadInput = z.infer<typeof documentoUploadInput>;
 export type DocumentoUploadResponse = z.infer<typeof documentoUploadResponse>;

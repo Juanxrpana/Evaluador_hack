@@ -3,7 +3,11 @@ import { ProyectoNoEncontradoError } from '../proyectos/proyecto.service.ts';
 import { ProveedorNoEncontradoError } from '../proveedores/proveedor.service.ts';
 import type { ProveedorReader } from '../proveedores/proveedor.reader.ts';
 import type { ProyectoReader } from '../proyectos/proyecto.reader.ts';
-import type { CreatePropuestaInput, PropuestaReader } from './propuesta.reader.ts';
+import type {
+  CreatePropuestaInput,
+  PropuestaReader,
+  UpdatePropuestaInput,
+} from './propuesta.reader.ts';
 import type { PropuestaTransactionRunner } from './propuesta.transaction.ts';
 
 export class PropuestaService {
@@ -68,6 +72,48 @@ export class PropuestaService {
     }
 
     return creada;
+  }
+
+  async actualizar(id: string, input: UpdatePropuestaInput): Promise<Propuesta> {
+    await this.#runInTransaction(async ({ propuestas, audit }) => {
+      const actualizada = await propuestas.update(id, input);
+
+      if (!actualizada) {
+        throw new PropuestaNoEncontradaError(id);
+      }
+
+      await audit.record({
+        action: 'propuesta.update',
+        resource: 'propuesta',
+        resourceId: id,
+      });
+    });
+
+    const actualizada = await this.#reader.get(id);
+
+    if (!actualizada) {
+      throw new PropuestaNoEncontradaError(id);
+    }
+
+    return actualizada;
+  }
+
+  async eliminar(id: string): Promise<{ id: string }> {
+    return this.#runInTransaction(async ({ propuestas, audit }) => {
+      const eliminada = await propuestas.remove(id);
+
+      if (!eliminada) {
+        throw new PropuestaNoEncontradaError(id);
+      }
+
+      await audit.record({
+        action: 'propuesta.delete',
+        resource: 'propuesta',
+        resourceId: id,
+      });
+
+      return { id };
+    });
   }
 }
 
