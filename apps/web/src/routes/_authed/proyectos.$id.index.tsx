@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import type { Propuesta, Proveedor } from '@repo/contracts';
 import { FileIcon } from '../../components/Icons';
 import { Badge } from '../../components/ui';
@@ -969,6 +969,7 @@ function ChatDelProyecto({ proyectoId }: { proyectoId: string }) {
   >([]);
   const [pregunta, setPregunta] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const hiloRef = useRef<HTMLDivElement | null>(null);
 
   const preguntar = useMutation(
     orpc.chat.ask.mutationOptions({
@@ -993,6 +994,10 @@ function ChatDelProyecto({ proyectoId }: { proyectoId: string }) {
     }),
   );
 
+  useEffect(() => {
+    hiloRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [mensajes, preguntar.isPending]);
+
   function enviar(event: FormEvent) {
     event.preventDefault();
 
@@ -1006,40 +1011,80 @@ function ChatDelProyecto({ proyectoId }: { proyectoId: string }) {
   }
 
   return (
-    <form className="form-panel" onSubmit={enviar}>
-      <h2>Chat con la IA del proyecto</h2>
+    <section className="chat" aria-label="Chat con la IA del proyecto">
+      <header className="chat__cabecera">
+        <span className="chat__avatar" aria-hidden="true">
+          ⚡
+        </span>
+        <div>
+          <h2>Chat con la IA del proyecto</h2>
+          <p className="chat__subtitulo">
+            Responde con los documentos vectorizados y el historial de costos. Cita sus fuentes.
+          </p>
+        </div>
+      </header>
 
-      <div className="stack">
+      <div className="chat__hilo" role="log" aria-live="polite">
+        {mensajes.length === 0 && (
+          <div className="chat__vacio">
+            <p>Preguntale al agente. Ejemplos:</p>
+            <ul>
+              <li>«¿Qué exige el pliego de requerimientos?»</li>
+              <li>«¿Quién cobró menos recargos aparte?»</li>
+              <li>«Compara los montos de las propuestas.»</li>
+            </ul>
+          </div>
+        )}
         {mensajes.map((mensaje) => (
-          <div className={`chat-bubble chat-bubble--${mensaje.rol}`} key={mensaje.id}>
-            <strong>{mensaje.rol === 'usuario' ? 'Tú' : 'Asistente'}</strong>
-            <p>{mensaje.texto}</p>
-            {mensaje.fuentes && mensaje.fuentes.length > 0 && (
-              <p className="chat-fuentes">
-                Fuentes:{' '}
-                {mensaje.fuentes
-                  .map((fuente) => `${fuente.titulo ?? 'sin título'} (${fuente.tipo})`)
-                  .join(' · ')}
-              </p>
-            )}
+          <div className={`chat-linea chat-linea--${mensaje.rol}`} key={mensaje.id}>
+            <span className="chat-linea__avatar" aria-hidden="true">
+              {mensaje.rol === 'usuario' ? '🧑' : '⚡'}
+            </span>
+            <div className={`chat-bubble chat-bubble--${mensaje.rol}`}>
+              <p>{mensaje.texto}</p>
+              {mensaje.fuentes && mensaje.fuentes.length > 0 && (
+                <div className="chat-fuentes">
+                  <span className="chat-fuentes__titulo">Fuentes:</span>
+                  {mensaje.fuentes.map((fuente) => (
+                    <span className="chat-fuentes__chip" key={fuente.id} title={fuente.tipo}>
+                      {fuente.titulo ?? 'sin título'}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ))}
+        {preguntar.isPending && (
+          <div className="chat-linea chat-linea--asistente">
+            <span className="chat-linea__avatar" aria-hidden="true">
+              ⚡
+            </span>
+            <div className="chat-bubble chat-bubble--asistente chat-bubble--escribiendo">
+              <span className="chat-punto" />
+              <span className="chat-punto" />
+              <span className="chat-punto" />
+            </div>
+          </div>
+        )}
+        <div ref={hiloRef} />
       </div>
 
-      <div className="field">
-        <label htmlFor="chat-pregunta">Pregunta</label>
+      <form className="chat__entrada" onSubmit={enviar}>
         <input
           id="chat-pregunta"
           value={pregunta}
           onChange={(event) => setPregunta(event.target.value)}
-          placeholder="¿Cuál ha sido el costo promedio de este proveedor? ¿Qué requisitos exige el pliego?"
+          placeholder="Escribe tu pregunta sobre el proyecto…"
+          aria-label="Pregunta para la IA"
+          autoComplete="off"
         />
-      </div>
+        <button type="submit" disabled={preguntar.isPending || pregunta.trim().length < 3}>
+          Enviar
+        </button>
+      </form>
       {error && <p className="field-error">{error}</p>}
-      <button type="submit" disabled={preguntar.isPending || pregunta.trim().length < 3}>
-        {preguntar.isPending ? 'Consultando a la IA…' : 'Preguntar'}
-      </button>
-    </form>
+    </section>
   );
 }
 

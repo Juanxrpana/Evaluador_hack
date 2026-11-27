@@ -289,6 +289,8 @@ function InformePage() {
           </p>
         </header>
 
+        <RankingAgente proyectoId={id} />
+
         <section>
           <h2>Tasa aplicada</h2>
           {tasa ? (
@@ -503,5 +505,64 @@ function InformePage() {
         </footer>
       </article>
     </div>
+  );
+}
+
+/**
+ * Ranking comparativo producido por el agente evaluador: propuestas válidas
+ * ordenadas por calidad y costo real, luego las descartadas con su causa.
+ */
+function RankingAgente({ proyectoId }: { proyectoId: string }) {
+  const listaQuery = useQuery(orpc.evaluaciones.list.queryOptions({ input: { proyectoId } }));
+  const ultima = (listaQuery.data ?? [])[0];
+
+  const detalleQuery = useQuery({
+    ...orpc.evaluaciones.get.queryOptions({ input: { id: ultima?.id ?? '' } }),
+    enabled: Boolean(ultima),
+    retry: 0,
+  });
+
+  const ranking = detalleQuery.data?.informe?.ranking ?? [];
+
+  if (!ultima) {
+    return (
+      <section>
+        <h2>Ranking del agente</h2>
+        <p className="fine">
+          Aún no se ha lanzado la evaluación automática: usa el botón «⚡ Evaluar propuestas» para
+          generar el ranking comparativo entre todas las propuestas.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <h2>Ranking del agente {detalleQuery.isFetching ? '(actualizando…)' : ''}</h2>
+      {detalleQuery.error ? (
+        <p className="field-error">
+          La última evaluación falló en registrarse: vuelve a lanzar la evaluación.
+        </p>
+      ) : (
+        <ol className="ranking">
+          {ranking.map((fila) => (
+            <li className="ranking__item" key={fila.propuestaId}>
+              <span className="ranking__pos">{fila.posicion}</span>
+              <div>
+                <div className="ranking__nombre">
+                  {fila.proveedor}
+                  {fila.decision === 'descartada' ? ' — descartada' : ''}
+                </div>
+                <div className="ranking__motivo">{fila.motivo ?? ''}</div>
+              </div>
+              <span className="ranking__meta">
+                {fila.puntaje !== null ? `Calidad ${fila.puntaje}/100 · ` : ''}
+                {fila.costoRealUsd !== null ? `${fila.costoRealUsd} USD` : ''}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }

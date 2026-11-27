@@ -106,10 +106,31 @@ export class DocumentoService {
     // 1) Extract text: PDFs parsed locally, images described by the vision model.
     const texto = await this.#extraer(input.mime, bytes, input.nombre);
 
+    // Provenance (E.3.b): the AI must always know WHICH supplier a file
+    // belongs to, even when the file is named 01.pdf. The knowledge chunk
+    // titles carry the supplier + proposal + file name.
+    const proveedorAsociado = input.proveedorId
+      ? await this.#proveedores.get(input.proveedorId)
+      : null;
+    const nombreProveedor = proveedorAsociado?.nombre ?? null;
+    const tituloConocimiento =
+      tipo === 'requerimientos'
+        ? `Requerimientos del proyecto — ${input.nombre}`
+        : nombreProveedor
+          ? `Propuesta de ${nombreProveedor} — ${input.nombre}`
+          : input.nombre;
+    const primeraLineaProcedencia = nombreProveedor
+      ? `Documento presentado por el proveedor ${nombreProveedor}.`
+      : null;
+
     // 2) Chunk and embed OUTSIDE the transaction.
     const chunks = chunkText(texto);
     if (chunks.length === 0) {
       throw new ContenidoIlegibleError(input.mime);
+    }
+
+    if (primeraLineaProcedencia) {
+      chunks[0] = { index: 0, text: `${primeraLineaProcedencia}\n${chunks[0].text}` };
     }
 
     const embeddings = await this.#embeddings.embed(chunks.map((chunk) => chunk.text));
@@ -160,10 +181,14 @@ export class DocumentoService {
         const chunksInsertados = await conocimiento.insertConEmbeddings({
           proyectoId: input.proyectoId,
           tipo: 'documento',
-          titulo: input.nombre,
+          titulo: tituloConocimiento,
           documentoId,
           chunks,
           embeddings,
+          metadata: {
+            ...(input.proveedorId ? { proveedorId: input.proveedorId } : {}),
+            ...(input.propuestaId ? { propuestaId: input.propuestaId } : {}),
+          },
         });
 
         let historialInsertados = 0;

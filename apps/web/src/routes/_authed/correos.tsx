@@ -138,6 +138,12 @@ function ModalCorreo({ uid, onCerrar }: { uid: number; onCerrar: () => void }) {
                 </div>
               </dl>
 
+              <AnalizarAdjunto
+                uid={detalle.uid}
+                carpeta={detalle.carpeta}
+                adjuntos={detalle.adjuntos}
+              />
+
               <pre className="cuerpo-correo">{detalle.cuerpo || '(sin texto)'}</pre>
 
               {descargaError && <p className="field-error">{descargaError}</p>}
@@ -146,6 +152,137 @@ function ModalCorreo({ uid, onCerrar }: { uid: number; onCerrar: () => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Asigna un adjunto del correo a un proveedor y lo manda a analizar dentro
+ * de un proyecto: lo descarga del IMAP, lo guarda en PostgreSQL, lo
+ * vectoriza y (si tiene propuesta) extrae monto/recargos/ítems.
+ */
+function AnalizarAdjunto({
+  uid,
+  carpeta,
+  adjuntos,
+}: {
+  uid: number;
+  carpeta: string;
+  adjuntos: Array<{ parte: string; nombre: string; mime: string; tamanoBytes: number }>;
+}) {
+  const queryClient = useQueryClient();
+  const [parte, setParte] = useState(adjuntos[0]?.parte ?? '');
+  const [proyectoId, setProyectoId] = useState('');
+  const [proveedorId, setProveedorId] = useState('');
+  const [tipo, setTipo] = useState<'propuesta' | 'requerimientos'>('propuesta');
+  const [mensaje, setMensaje] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const proyectosQuery = useQuery(orpc.proyectos.list.queryOptions());
+  const proveedoresQuery = useQuery(orpc.proveedores.list.queryOptions());
+
+  const analizar = useMutation(
+    orpc.correos.ingestarAdjunto.mutationOptions({
+      onSuccess: (resultado) => {
+        setError(null);
+        setMensaje(
+          `Analizado: ${resultado.chunks} fragmentos vectorizados` +
+            (resultado.extraccion
+              ? ` · monto ${resultado.extraccion.montoTotal ?? 'no detectado'} · ${resultado.extraccion.recargos} recargos · ${resultado.extraccion.items} ítems`
+              : ''),
+        );
+        return queryClient.invalidateQueries({
+          queryKey: orpc.documentos.list.queryKey({ input: { proyectoId } }),
+        });
+      },
+      onError: (cause) => {
+        setMensaje(null);
+        setError(messageOf(cause));
+      },
+    }),
+  );
+
+  if (adjuntos.length === 0) {
+    return null;
+  }
+
+  return (
+    <form
+      className="form-panel"
+      onSubmit={(event) => {
+        event.preventDefault();
+        analizar.mutate({
+          uid,
+          parte,
+          carpeta,
+          proyectoId,
+          proveedorId: proveedorId || undefined,
+          tipo,
+        });
+      }}
+    >
+      <h3>Analizar adjunto en un proyecto</h3>
+      <div className="field">
+        <label htmlFor="analizar-adjunto">Adjunto</label>
+        <select id="analizar-adjunto" value={parte} onChange={(e) => setParte(e.target.value)}>
+          {adjuntos.map((adjunto) => (
+            <option key={adjunto.parte} value={adjunto.parte}>
+              {adjunto.nombre} · {formatearTamano(adjunto.tamanoBytes)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label htmlFor="analizar-proyecto">Proyecto</label>
+        <select
+          id="analizar-proyecto"
+          value={proyectoId}
+          onChange={(e) => setProyectoId(e.target.value)}
+          required
+        >
+          <option value="" disabled>
+            Selecciona el proyecto
+          </option>
+          {(proyectosQuery.data ?? []).map((proyecto) => (
+            <option key={proyecto.id} value={proyecto.id}>
+              {proyecto.nombre}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label htmlFor="analizar-proveedor">Proveedor (crea la propuesta si falta)</label>
+        <select
+          id="analizar-proveedor"
+          value={proveedorId}
+          onChange={(e) => setProveedorId(e.target.value)}
+        >
+          <option value="">Sin proveedor (solo conocimiento)</option>
+          {(proveedoresQuery.data ?? []).map((proveedor) => (
+            <option key={proveedor.id} value={proveedor.id}>
+              {proveedor.nombre}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label htmlFor="analizar-tipo">Tipo de documento</label>
+        <select
+          id="analizar-tipo"
+          value={tipo}
+          onChange={(e) =>
+            setTipo(e.target.value === 'requerimientos' ? 'requerimientos' : 'propuesta')
+          }
+        >
+          <option value="propuesta">Propuesta</option>
+          <option value="requerimientos">Requerimientos del proyecto</option>
+        </select>
+      </div>
+      {mensaje && <p className="lede">{mensaje}</p>}
+      {error && <p className="field-error">{error}</p>}
+      <button type="submit" disabled={analizar.isPending || !proyectoId}>
+        {analizar.isPending ? 'Descargando y analizando…' : '⚡ Enviar a análisis'}
+      </button>
+    </form>
   );
 }
 
@@ -212,11 +349,13 @@ function CorreosPage() {
         </ul>
       )}
 
-      {seleccionado !== null && (
+      {seleccionado !== null &&
         // Portal a <body>: la sección .page tiene una animación de entrada con
         // transform retenido, que descuelga el position:fixed del viewport.
-        createPortal(<ModalCorreo uid={seleccionado} onCerrar={() => setSeleccionado(null)} />, document.body)
-      )}
+        createPortal(
+          <ModalCorreo uid={seleccionado} onCerrar={() => setSeleccionado(null)} />,
+          document.body,
+        )}
     </section>
   );
 }

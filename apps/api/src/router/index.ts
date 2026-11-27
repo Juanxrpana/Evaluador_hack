@@ -416,6 +416,38 @@ export function createRouter({
       adjunto: os.correos.adjunto
         .use(authenticated)
         .handler(({ input }) => correos.descargarAdjunto(input).catch(mapDomainError)),
+      ingestarAdjunto: os.correos.ingestarAdjunto
+        .use(requirePermiso('conocimiento.crear'))
+        .handler(async ({ input }) => {
+          const adjunto = await correos.descargarAdjunto({
+            uid: input.uid,
+            parte: input.parte,
+            carpeta: input.carpeta,
+          });
+
+          // Sin propuesta explícita, se crea una para el proveedor al vuelo.
+          let propuestaId = input.propuestaId;
+
+          if (!propuestaId && input.proveedorId) {
+            const creada = await propuestas.create({
+              proyectoId: input.proyectoId,
+              proveedorId: input.proveedorId,
+            });
+            propuestaId = creada.id;
+          }
+
+          const resultado = await documentos.subir({
+            proyectoId: input.proyectoId,
+            propuestaId,
+            proveedorId: input.proveedorId,
+            nombre: adjunto.nombre,
+            mime: adjunto.mime,
+            tipo: input.tipo,
+            contenidoBase64: adjunto.contenidoBase64,
+          });
+
+          return resultado;
+        }),
     },
   });
 }

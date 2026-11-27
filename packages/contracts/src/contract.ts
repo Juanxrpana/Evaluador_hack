@@ -554,6 +554,24 @@ export const contract = {
       })
       .input(correoAdjuntoInput)
       .output(correoAdjuntoContenidoSchema),
+    /** Ingest one attachment straight into a project/proposal for analysis. */
+    ingestarAdjunto: oc
+      .route({
+        method: 'POST',
+        path: '/correos/ingestar-adjunto',
+        tags: ['evaluador'],
+        summary:
+          'Download an email attachment and analyze it inside a proyecto: vectorize it, extract monto/recargos/ítems, and link it to the proveedor',
+      })
+      .input(
+        correoAdjuntoInput.extend({
+          proyectoId: z.uuid(),
+          proveedorId: z.uuid().optional(),
+          propuestaId: z.uuid().optional(),
+          tipo: z.enum(['propuesta', 'requerimientos']).default('propuesta'),
+        }),
+      )
+      .output(documentoUploadResponse),
   },
 };
 

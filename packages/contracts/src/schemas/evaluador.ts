@@ -244,6 +244,18 @@ export const informeSchema = z.object({
   alertas: z.array(alertaSchema),
   tasaBcv: montoSchema.nullable(),
   generadoEn: z.iso.datetime(),
+  /** Explicit comparative ranking among ALL proposals (valid first). */
+  ranking: z.array(
+    z.object({
+      posicion: z.number().int().positive(),
+      propuestaId: z.uuid(),
+      proveedor: z.string(),
+      puntaje: z.number().nullable(),
+      costoRealUsd: montoSchema.nullable(),
+      decision: z.enum(['valida', 'descartada']),
+      motivo: z.string().nullable(),
+    }),
+  ),
 });
 
 export const evaluacionDetalleSchema = z.object({

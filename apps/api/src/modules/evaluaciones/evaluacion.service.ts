@@ -230,6 +230,16 @@ export class EvaluacionService {
       }
     }
 
+    if (informe.ranking.length > 0) {
+      lineas.push('');
+      lineas.push('## Ranking final entre propuestas');
+      for (const fila of informe.ranking) {
+        lineas.push(
+          `${fila.posicion}. ${fila.proveedor} — ${fila.decision === 'valida' ? 'VÁLIDA' : 'DESCARTADA'}${fila.puntaje === null ? '' : ` (calidad ${fila.puntaje}/100)`}${fila.costoRealUsd === null ? '' : `, costo real ${fila.costoRealUsd} USD`}. ${fila.motivo ?? ''}`,
+        );
+      }
+    }
+
     if (informe.descartes.length > 0) {
       lineas.push('');
       lineas.push('## Dictámenes de descarte');
@@ -728,6 +738,25 @@ export class EvaluacionService {
       ],
       tasaBcv: tasaBcv === null ? null : Number(tasaBcv).toFixed(2),
       generadoEn: new Date().toISOString(),
+      ranking: [...ordenadas, ...resultados.filter((resultado) => resultado.causas.length > 0)].map(
+        (resultado, indice) => ({
+          posicion: indice + 1,
+          propuestaId: resultado.propuesta.id,
+          proveedor: nombreDe(resultado),
+          puntaje: resultado.puntaje,
+          costoRealUsd: resultado.costoRealUsd,
+          decision: resultado.causas.length === 0 ? ('valida' as const) : ('descartada' as const),
+          motivo:
+            resultado.causas.length > 0
+              ? `Descartada: ${resultado.causas[0]}`
+              : resultado.desviaciones.some(
+                    (desviacion) =>
+                      desviacion.desviacionPct !== null && desviacion.desviacionPct > 0,
+                  )
+                ? `Calidad técnica ${resultado.puntaje ?? 'n/d'}/100; en el mercado cuesta menos un insumo equivalente`
+                : `Calidad técnica ${resultado.puntaje ?? 'n/d'}/100 con el mejor costo total real`,
+        }),
+      ),
     };
   }
 
